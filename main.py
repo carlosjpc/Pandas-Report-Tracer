@@ -8,9 +8,6 @@ import pandas as pd
 
 from utils.columns_to_work_with import OneInputToFinalOptimization
 
-NATURAL_DIVIDER_THRESOLD = 3
-TODAY = datetime.datetime.today()
-
 
 def read_input(filename, input_directory='/tmp/input'):
     try:
