@@ -164,11 +164,14 @@ class OneInputToFinalOptimization:
                     'Useless rows': unused_inputdf_rows
                 }}
         )
-        print("Column {} with dtype: {}, has {} unused rows".format(col, self.input_df[col].dtype, unused_inputdf_rows))
         if len(unused_categos) > 100:
             print(random.sample(unused_categos, 100))
         else:
             print(unused_categos)
+        print("Found query optimizing chance in col: {},({}) rows, consider filtering: {}".format(
+                col, unused_inputdf_rows, unused_categos)
+             )
+        print("Values were truncated to less the 100")
 
     @staticmethod
     def isin_row(row, df):
