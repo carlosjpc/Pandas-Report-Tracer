@@ -105,7 +105,7 @@ class OneInputToFinalOptimization:
 
     def set_slicing_cols(self):
         for col in self.input_df.columns:
-            if 'date' in col:
+            if 'date' in col or 'Date' in col:
                 if self.convert_input_col_to_date(col):
                     self.slicing_cols.update({col: 'date'})
             elif is_string_dtype(self.input_df[col]):
@@ -236,7 +236,7 @@ class OneInputToFinalOptimization:
 
     def convert_input_col_to_date(self, col_name):
         try:
-            self.input_df[col_name] = pd.to_datetime(self.input_df[col_name], errors='coerce')
+            self.input_df[col_name] = pd.to_datetime(self.input_df[col_name])
         except Exception:
             return False
         return True

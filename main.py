@@ -24,8 +24,8 @@ def read_input(filename, input_directory='/tmp/input'):
 
 if __name__ == "__main__":
     # input_filenames = {'file_name': 'rename_columns_dictionary'}
-    input_df = pd.read_csv('/tmp/input/property_items.csv', escapechar='\\')
+    input_df = pd.read_csv('/tmp/input/committed_revisions_all.csv', escapechar='\\')
     resulting_df = pd.read_csv('/tmp/result/item_transactions.csv', escapechar='\\')
     # for input_filename, rename_dict in input_filenames.items():
-    x = OneInputToFinalOptimization(input_df, resulting_df, ['itemId'])
+    x = OneInputToFinalOptimization(input_df, resulting_df, ['revisionId'])
     
