@@ -23,8 +23,6 @@ RENAMING_COLS_DICT = {
 
 
 if __name__ == "__main__":
-    # input_filenames = {'file_name': 'rename_columns_dictionary'}
-    # get input data file names
     result_file = glob.glob(RESULT_PATH + "/*.csv")
     resulting_df = pd.read_csv(result_file[0], escapechar='\\')
     filenames = glob.glob(INPUT_PATH + "/*.csv")

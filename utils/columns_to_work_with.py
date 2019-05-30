@@ -15,6 +15,9 @@ MULTIPLE_COMBINATION_FILTERS = 5000
 MULTI_COL_FILTER_RATIO = 0.05
 TODAY = datetime.date(2019,4,1)
 
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+
 
 class OneInputToFinalOptimization:
     combos_to_check_in_final = list()
@@ -30,7 +33,7 @@ class OneInputToFinalOptimization:
     usage_percentage = dict()
 
     def __init__(self, input_df, resulting_df, merging_cols=None):
-        print("Starting Analisis")
+        logging.info("Starting Analisis")
         self.input_df = input_df
         self.resulting_df = resulting_df
         self.input_df_cols = input_df.columns
@@ -41,18 +44,19 @@ class OneInputToFinalOptimization:
             return
         self.final_df_to_work_with()
         self.columns_usage_percentage()
-        print("Column usage percentage:")
-        print(self.usage_percentage)
+        logging.info("Column usage percentage:")
+        logging.info(self.usage_percentage)
         self.set_slicing_cols()
-        print("Slicing cols:")
-        print(self.slicing_cols)
+        logging.info("Slicing cols:")
+        logging.info(self.slicing_cols)
         for slicing_col, dtype in self.slicing_cols.items():
             if 'date' in dtype:
-                self.determine_date_range_usage(slicing_col)
+                self.determine_date_range_filters(slicing_col)
             else:
-                self.determine_category_col_usage(slicing_col)
+                self.determine_category_col_filters(slicing_col)
         self.determine_possible_multi_column_filters()
         self.determine_multi_column_filters()
+        self.determine_best_slicing_col_filter()
 
     def find_matching_cols(self):
         # to identify a column for merge it must contain 'id' or 'Id'
@@ -124,12 +128,12 @@ class OneInputToFinalOptimization:
         unique_rows = len(df_series.unique())
         total_rows = len(df_series)
         ratio = total_rows / unique_rows
-        print('Column: {} has {} unique rows in {} rows, a {} to 1 relationship'.format(
+        logging.info('Column: {} has {} unique rows in {} rows, a {} to 1 relationship'.format(
             df_series._name, str(unique_rows), str(total_rows), str(ratio)))
         if ratio > NATURAL_DIVIDER_THRESOLD:
             return 1
 
-    def determine_date_range_usage(self, col):
+    def determine_date_range_filters(self, col):
         date_slices = {
             'one_month_period': TODAY - datetime.timedelta(days=183),
             'one_quarter_period': TODAY - datetime.timedelta(days=183),
@@ -144,17 +148,17 @@ class OneInputToFinalOptimization:
             if len(lesser_date_input) and col in self.final_df.columns:
                 lesser_date_final = self.final_df.loc[self.final_df[col] < date_]
                 if len(lesser_date_final) == 0:
-                    print('Found query optimizing chance in col: {}, filter: {}'.format(col, period))
+                    logging.info('Found query optimizing chance in col: {}, filter: {}'.format(col, period))
                     self.filtering_quick_gains.update(
                         {col: {
                             'column': col,
                             'dtype': 'date',
                             'filter out': period,
-                            'Useless rows': lesser_date_input
+                            'Useless rows': len(lesser_date_input)
                         }}
                     )
 
-    def determine_category_col_usage(self, col):
+    def determine_category_col_filters(self, col):
         if self.usage_percentage[col] == 1:
             return
         unused_categos = set(self.input_df[col].unique()) - set(self.final_df[col].unique())
@@ -168,11 +172,11 @@ class OneInputToFinalOptimization:
                 }}
         )
         if len(unused_categos) > 100:
-            print(
+            logging.info(
                 "Found query optimizing chance in col: {}, reading ({}) unused rows, consider filtering out: {}".format(
                     col, unused_inputdf_rows, random.sample(unused_categos, 100)))
         else:
-            print(
+            logging.info(
                 "Found query optimizing chance in col: {}, reading ({}) unused rows, consider filtering out: {}".format(
                     col, unused_inputdf_rows, unused_categos))
 
@@ -204,8 +208,8 @@ class OneInputToFinalOptimization:
             self.catego_cols = self.slicing_cols
         else:
             self.set_catego_columns()
-        print("Category Columns:")
-        print(self.catego_cols)
+        logging.info("Category Columns:")
+        logging.info(self.catego_cols)
         for col in self.catego_cols:
             unique_rows = list(self.input_df[col].unique())
             lists_for_prod.append(unique_rows)
@@ -221,14 +225,14 @@ class OneInputToFinalOptimization:
                 combos_to_exclude.append(combo_row[0])
         self.combos_to_exclude = pd.concat(combos_to_exclude)
 
-        print("""
+        logging.info("""
         Of the {} value combinations across columns: {}; {} don't show in the final DF, consider filtering those out.
         """.format(
             len(self.combos_to_check_in_final),
             self.combos_to_exclude.columns,
             len(self.combos_to_exclude)
         ))
-        print(self.combos_to_exclude)
+        logging.info(self.combos_to_exclude)
 
     def use_all_slicing_cols_as_catego_cols(self):
         # because this will be used to generate combinations (which grow quiet fast) we need to be more careful
@@ -256,3 +260,16 @@ class OneInputToFinalOptimization:
         except Exception:
             return False
         return True
+
+    def determine_best_slicing_col_filter(self):
+        # two deciding factors: total number of rows that can be filtered (the larger the better),
+        # the number of elements to filter out (the larger the worse)
+        efficiency_indicator_list = list()
+        for k, d_info in self.filtering_quick_gains.items():
+            x = int(d_info['Useless rows']) - NATURAL_DIVIDER_THRESOLD*len(d_info['filter out'])
+            efficiency_indicator_list.append((d_info['column'], x))
+        max_efficiency_col = max([x[1] for x in efficiency_indicator_list])
+        logging.info("The suggested column to filter is {}".format(
+            [item for item in efficiency_indicator_list if item[1] == max_efficiency_col][0]
+        ))
+        logging.info("Full efficiency analisis: {}".format(efficiency_indicator_list))
