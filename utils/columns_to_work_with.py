@@ -11,7 +11,8 @@ import pandas as pd
 from pandas.api.types import is_string_dtype, is_integer_dtype, is_bool_dtype
 
 NATURAL_DIVIDER_THRESOLD = 30
-MULTIPLE_COMBINATION_FILTERS = 50000
+MULTIPLE_COMBINATION_FILTERS = 5000
+MULTI_COL_FILTER_RATIO = 0.05
 TODAY = datetime.date(2019,4,1)
 
 
@@ -29,7 +30,7 @@ class OneInputToFinalOptimization:
     usage_percentage = dict()
 
     def __init__(self, input_df, resulting_df, merging_cols=None):
-        print("Testing logger")
+        print("Starting Analisis")
         self.input_df = input_df
         self.resulting_df = resulting_df
         self.input_df_cols = input_df.columns
@@ -146,8 +147,9 @@ class OneInputToFinalOptimization:
                     print('Found query optimizing chance in col: {}, filter: {}'.format(col, period))
                     self.filtering_quick_gains.update(
                         {col: {
+                            'column': col,
                             'dtype': 'date',
-                            'filter': period,
+                            'filter out': period,
                             'Useless rows': lesser_date_input
                         }}
                     )
@@ -159,19 +161,20 @@ class OneInputToFinalOptimization:
         unused_inputdf_rows = len(self.input_df.loc[self.input_df[col].isin(unused_categos)])
         self.filtering_quick_gains.update(
                 {col: {
-                    'dtype': self.input_df[col].dtype,
+                    'column': col,
+                    'dtype': self.slicing_cols[col],
                     'filter out': unused_categos,
                     'Useless rows': unused_inputdf_rows
                 }}
         )
         if len(unused_categos) > 100:
-            print(random.sample(unused_categos, 100))
+            print(
+                "Found query optimizing chance in col: {}, reading ({}) unused rows, consider filtering out: {}".format(
+                    col, unused_inputdf_rows, random.sample(unused_categos, 100)))
         else:
-            print(unused_categos)
-        print("Found query optimizing chance in col: {},({}) rows, consider filtering: {}".format(
-                col, unused_inputdf_rows, unused_categos)
-             )
-        print("Values were truncated to less the 100")
+            print(
+                "Found query optimizing chance in col: {}, reading ({}) unused rows, consider filtering out: {}".format(
+                    col, unused_inputdf_rows, unused_categos))
 
     @staticmethod
     def isin_row(row, df):
@@ -179,13 +182,21 @@ class OneInputToFinalOptimization:
         bool_series = functools.reduce(lambda x, y: x & y, [df[col].isin(row[col]) for col in cols])
         return bool_series.any()
 
+    def combo_appears_often_in_input(self, row, input_catego_df):
+        df = input_catego_df.get_group(row)
+        multi_col_filter_ratio = len(df) / len(self.input_df)
+        if multi_col_filter_ratio > MULTI_COL_FILTER_RATIO:
+            return 1
+        else:
+            return 0
+
     def determine_possible_multi_column_filters(self):
         combinations_generator = self.generate_possible_combinations()
         input_catego_df = self.input_df[self.catego_cols].drop_duplicates()
         for combo in combinations_generator:
-            combo_row = pd.DataFrame([combo], columns=input_catego_df.columns)
-            if self.isin_row(combo_row, input_catego_df):
-                self.combos_to_check_in_final.append(combo_row)
+            combo_row_df = pd.DataFrame([combo], columns=input_catego_df.columns)
+            if self.isin_row(combo_row_df, input_catego_df):
+                self.combos_to_check_in_final.append((combo_row_df, combo))
 
     def generate_possible_combinations(self):
         lists_for_prod = list()
@@ -202,20 +213,22 @@ class OneInputToFinalOptimization:
 
     def determine_multi_column_filters(self):
         final_catego_df = self.final_df[self.catego_cols].drop_duplicates()
+        input_catego_df = self.input_df.groupby(self.catego_cols)
         combos_to_exclude = list()
         for combo_row in self.combos_to_check_in_final:
-            if self.isin_row(combo_row, final_catego_df):
-                combos_to_exclude.append(combo_row)
-        combos_to_exclude = pd.concat(combos_to_exclude)
+            if (self.isin_row(combo_row[0], final_catego_df) and
+                    self.combo_appears_often_in_input(combo_row[1], input_catego_df)):
+                combos_to_exclude.append(combo_row[0])
+        self.combos_to_exclude = pd.concat(combos_to_exclude)
 
         print("""
         Of the {} value combinations across columns: {}; {} don't show in the final DF, consider filtering those out.
         """.format(
             len(self.combos_to_check_in_final),
-            combos_to_exclude.columns,
-            len(combos_to_exclude)
+            self.combos_to_exclude.columns,
+            len(self.combos_to_exclude)
         ))
-        print(combos_to_exclude)
+        print(self.combos_to_exclude)
 
     def use_all_slicing_cols_as_catego_cols(self):
         # because this will be used to generate combinations (which grow quiet fast) we need to be more careful
@@ -235,7 +248,7 @@ class OneInputToFinalOptimization:
             max_key = max(slicing_cols_unique_length.items(), key=operator.itemgetter(1))[0]
             del slicing_cols_unique_length[max_key]
             number_of_combinations = reduce(lambda x, y: x*y, slicing_cols_unique_length.values())
-        self.catego_cols = slicing_cols_unique_length.keys()
+        self.catego_cols = list(slicing_cols_unique_length.keys())
 
     def convert_input_col_to_date(self, col_name):
         try:
