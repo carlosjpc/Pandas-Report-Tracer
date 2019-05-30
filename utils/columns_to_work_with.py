@@ -263,8 +263,13 @@ class OneInputToFinalOptimization:
             return False
         return True
 
-    def find_largest_unused_catego_in_column(self, column):
-        pass
+    def find_largest_unused_catego_in_column(self, col):
+        unused_categos = set(self.input_df[col].unique()) - set(self.final_df[col].unique())
+        category_potential = dict()
+        for category in unused_categos:
+            unused_rows_for_category = len(self.input_df.loc[self.input_df[col] == category])
+            category_potential.update({category, unused_rows_for_category})
+        return max(category_potential.iteritems(), key=operator.itemgetter(1))[0]
 
     def determine_best_slicing_col_filter(self):
         # two deciding factors: total number of rows that can be filtered (the larger the better),
@@ -272,12 +277,15 @@ class OneInputToFinalOptimization:
         efficiency_indicator_list = list()
         for k, d_info in self.filtering_quick_gains.items():
             efficiency_indicator_list.append((d_info['column'], d_info['weighted_benefit']))
-        import pudb; pudb.set_trace()
         max_weighted_benefit = max([x[1] for x in efficiency_indicator_list])
         max_eficiency_potential_col = [item for item in efficiency_indicator_list if item[1] == max_weighted_benefit][0][0]
         if self.filtering_quick_gains[max_eficiency_potential_col]['dtype'] != 'date':
-            self.find_largest_unused_catego_in_column(max_eficiency_potential_col)
-        logging.info("The suggested column to filter is {}".format(
-            [item for item in efficiency_indicator_list if item[1] == max_efficiency_col][0]
-        ))
+            category_to_filter = self.find_largest_unused_catego_in_column(max_eficiency_potential_col)
+            logging.info("The suggested column to filter is {}, recommended value to filter: {}".format(
+                max_eficiency_potential_col, category_to_filter
+            ))
+        else:
+            logging.info("The suggested column to filter is {}, recommended period to filter: {}".format(
+                max_eficiency_potential_col, self.filtering_quick_gains[max_eficiency_potential_col]['filter_out']
+            ))
         logging.info("Full efficiency analisis: {}".format(efficiency_indicator_list))
