@@ -1,0 +1,74 @@
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+</head>
+<body>
+    <div class="container-fluid">
+        <h1>Inputs Analisis Report</h1>
+    </div>
+    <div class="container-fluid">
+            <h2>Meta Information:</h2>
+            <h3>Result Filepath: {{ result_file }}%</h3>
+            {% for file in input_files %}
+                <h3>Input Filepath: {{ file }}%</h3>
+            {% endfor %}
+            <h4>Merging on:</h4>
+            <ul>
+            {% for column in merging_cols %}
+                <li> {{ column }} </li>
+            {% endfor %}
+            </ul>
+            <h4>Matching columns:</h4>
+            <ul>
+            {% for column in matching_columns %}
+                <li> {{ column }} </li>
+            {% endfor %}
+            </ul>
+            <h4>Matching id columns:</h4>
+            <ul>
+            {% for column in matching_id_columns %}
+                <li> {{ column }} </li>
+            {% endfor %}
+            </ul>
+    </div>
+    <div class="container-fluid">
+            <h2>Columns usage</h2>
+            <p>This is a high view metric to give you an idea of the amount of date you are reading from a file or DB that actually makes it to the final result.</p>
+            <p>Usually we do direct and indirect filtering in the report, when possible it is better to filter out when reading, so we don't waste memory, time loading and computation power on unecessary data.</p>
+            <h4>The actual logic:</h4>
+            <p>matching_rows = set(self.input_df[col].unique()).intersection(self.final_df[col].unique())</p>
+            <p>percentage = len(matching_rows) / len(self.input_df[col].unique())</p>
+    </div>
+    <div class="container-fluid">
+        {{ data_usage_plot }}
+    </div>
+    <div class="container-fluid">
+         <h2>Filtering Quick Wins</h2>
+         <h4>This is the must useful part of the report</h4>
+         <p>If you filter out this values you will gain speed.</p>
+         <p>Important note: for Id columns check their meaning in their related table to make sense of the filters</p>
+    </div>
+    <div class="container-fluid">
+        {% for col in filtering_quick_gains %}
+            <div class="container-fluid">
+                <h3>Results for {{ col['column'] }}, with dtype: {{ col['dtype'] }}; unused rows being read: {{ col['Useless rows'] }}.</h3>
+                {%- for column in col['filter out']|slice(4) %}
+                <div class="container">
+                    <ul class="column-{{ loop.index }}">
+                    {%- for item in column %}
+                        <li>{{ item }}</li>
+                    {%- endfor %}
+                    </ul>
+                </div>
+                {%- endfor %}
+            </div>
+        {% endfor %}
+    </div>
+    <div class="container-fluid">
+        <h2>Multi column filters that you may consider:</h2>
+        {{ multi_columns_filter_df }}
+    </div>
+</body>

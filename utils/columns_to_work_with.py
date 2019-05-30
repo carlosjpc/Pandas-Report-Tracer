@@ -153,8 +153,9 @@ class OneInputToFinalOptimization:
                         {col: {
                             'column': col,
                             'dtype': 'date',
-                            'filter out': period,
-                            'Useless rows': len(lesser_date_input)
+                            'filter_out': period,
+                            'useless_rows': len(lesser_date_input),
+                            'weighted_benefit': len(lesser_date_input) - NATURAL_DIVIDER_THRESOLD*1
                         }}
                     )
 
@@ -167,8 +168,9 @@ class OneInputToFinalOptimization:
                 {col: {
                     'column': col,
                     'dtype': self.slicing_cols[col],
-                    'filter out': unused_categos,
-                    'Useless rows': unused_inputdf_rows
+                    'filter_out': unused_categos,
+                    'useless_rows': unused_inputdf_rows,
+                    'weighted_benefit': unused_inputdf_rows - NATURAL_DIVIDER_THRESOLD*len(unused_categos)
                 }}
         )
         if len(unused_categos) > 100:
@@ -261,14 +263,20 @@ class OneInputToFinalOptimization:
             return False
         return True
 
+    def find_largest_unused_catego_in_column(self, column):
+        pass
+
     def determine_best_slicing_col_filter(self):
         # two deciding factors: total number of rows that can be filtered (the larger the better),
         # the number of elements to filter out (the larger the worse)
         efficiency_indicator_list = list()
         for k, d_info in self.filtering_quick_gains.items():
-            x = int(d_info['Useless rows']) - NATURAL_DIVIDER_THRESOLD*len(d_info['filter out'])
-            efficiency_indicator_list.append((d_info['column'], x))
-        max_efficiency_col = max([x[1] for x in efficiency_indicator_list])
+            efficiency_indicator_list.append((d_info['column'], d_info['weighted_benefit']))
+        import pudb; pudb.set_trace()
+        max_weighted_benefit = max([x[1] for x in efficiency_indicator_list])
+        max_eficiency_potential_col = [item for item in efficiency_indicator_list if item[1] == max_weighted_benefit][0][0]
+        if self.filtering_quick_gains[max_eficiency_potential_col]['dtype'] != 'date':
+            self.find_largest_unused_catego_in_column(max_eficiency_potential_col)
         logging.info("The suggested column to filter is {}".format(
             [item for item in efficiency_indicator_list if item[1] == max_efficiency_col][0]
         ))
