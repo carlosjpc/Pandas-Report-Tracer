@@ -133,6 +133,19 @@ class OneInputToFinalOptimization:
         if ratio > NATURAL_DIVIDER_THRESOLD:
             return 1
 
+    def handle_na_in_date_cols(self, col):
+        number_of_nans = self.input_df[col].isna().sum()
+        if number_of_nans and self.final_df[col].isna().sum() == 0:
+            logging.info('Found query optimizing chance in col: {}, filter: nan'.format(col))
+            self.filtering_quick_gains.update(
+                {col: {
+                    'column': col,
+                    'dtype': 'date',
+                    'filter_out': 'nan',
+                    'useless_rows': number_of_nans,
+                    'weighted_benefit': number_of_nans - NATURAL_DIVIDER_THRESOLD*1
+                }})
+
     def determine_date_range_filters(self, col):
         date_slices = {
             'one_month_period': TODAY - datetime.timedelta(days=183),
@@ -142,18 +155,21 @@ class OneInputToFinalOptimization:
             'mtd': datetime.date(TODAY.year, TODAY.month, 1),
             'ytd': datetime.date(TODAY.year, 1, 1)
         }
+        self.handle_na_in_date_cols(col)
+        non_na_inputdf = self.input_df.dropna(subset=[col])
         self.final_df[col] = pd.to_datetime(self.final_df[col])
+        non_na_finaldf = self.final_df.dropna(subset=[col])
         for period, date_ in date_slices.items():
-            lesser_date_input = self.input_df.loc[self.input_df[col] < date_]
+            lesser_date_input = non_na_inputdf.loc[non_na_inputdf[col] < date_]
             if len(lesser_date_input) and col in self.final_df.columns:
-                lesser_date_final = self.final_df.loc[self.final_df[col] < date_]
+                lesser_date_final = non_na_finaldf.loc[non_na_finaldf[col] < date_]
                 if len(lesser_date_final) == 0:
                     logging.info('Found query optimizing chance in col: {}, filter: {}'.format(col, period))
                     self.filtering_quick_gains.update(
                         {col: {
                             'column': col,
                             'dtype': 'date',
-                            'filter_out': period,
+                            'filter_out': (period, date_),
                             'useless_rows': len(lesser_date_input),
                             'weighted_benefit': len(lesser_date_input) - NATURAL_DIVIDER_THRESOLD*1
                         }}
@@ -284,8 +300,18 @@ class OneInputToFinalOptimization:
             logging.info("The suggested column to filter is {}, recommended value to filter: {}".format(
                 max_eficiency_potential_col, category_to_filter
             ))
+            self.best_filter = (
+                max_eficiency_potential_col,
+                category_to_filter,
+                self.filtering_quick_gains[max_eficiency_potential_col]['dtype']
+            )
         else:
             logging.info("The suggested column to filter is {}, recommended period to filter: {}".format(
-                max_eficiency_potential_col, self.filtering_quick_gains[max_eficiency_potential_col]['filter_out']
+                max_eficiency_potential_col, self.filtering_quick_gains[max_eficiency_potential_col]['filter_out'][0]
             ))
+            self.best_filter = (
+                max_eficiency_potential_col,
+                self.filtering_quick_gains[max_eficiency_potential_col]['filter_out'][1],
+                self.filtering_quick_gains[max_eficiency_potential_col]['dtype']
+            )
         logging.info("Full efficiency analisis: {}".format(efficiency_indicator_list))
