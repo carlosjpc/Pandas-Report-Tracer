@@ -24,7 +24,7 @@ class OneInputToFinalOptimization:
     extended_resulting_df = pd.DataFrame()
     input_df = pd.DataFrame()
     input_df_cols = list()
-    filtering_quick_gains = dict()
+    filtering_quick_gains = list()
     matching_cols = set()
     matching_id_cols = list()
     merging_cols = list()
@@ -137,14 +137,13 @@ class OneInputToFinalOptimization:
         number_of_nans = self.input_df[col].isna().sum()
         if number_of_nans and self.final_df[col].isna().sum() == 0:
             logging.info('Found query optimizing chance in col: {}, filter: nan'.format(col))
-            self.filtering_quick_gains.update(
-                {col: {
-                    'column': col,
-                    'dtype': 'date',
-                    'filter_out': 'nan',
-                    'useless_rows': number_of_nans,
-                    'weighted_benefit': number_of_nans - NATURAL_DIVIDER_THRESOLD*1
-                }})
+            self.filtering_quick_gains.append({
+                'column': col,
+                'dtype': 'date',
+                'filter_out': 'nan',
+                'useless_rows': number_of_nans,
+                'weighted_benefit': number_of_nans - NATURAL_DIVIDER_THRESOLD*1
+            })
 
     def determine_date_range_filters(self, col):
         date_slices = {
@@ -165,30 +164,26 @@ class OneInputToFinalOptimization:
                 lesser_date_final = non_na_finaldf.loc[non_na_finaldf[col] < date_]
                 if len(lesser_date_final) == 0:
                     logging.info('Found query optimizing chance in col: {}, filter: {}'.format(col, period))
-                    self.filtering_quick_gains.update(
-                        {col: {
-                            'column': col,
-                            'dtype': 'date',
-                            'filter_out': (period, date_),
-                            'useless_rows': len(lesser_date_input),
-                            'weighted_benefit': len(lesser_date_input) - NATURAL_DIVIDER_THRESOLD*1
-                        }}
-                    )
+                    self.filtering_quick_gains.append({
+                        'column': col,
+                        'dtype': 'date',
+                        'filter_out': (period, date_),
+                        'useless_rows': len(lesser_date_input),
+                        'weighted_benefit': len(lesser_date_input) - NATURAL_DIVIDER_THRESOLD*1
+                    })
 
     def determine_category_col_filters(self, col):
         if self.usage_percentage[col] == 1:
             return
         unused_categos = set(self.input_df[col].unique()) - set(self.final_df[col].unique())
         unused_inputdf_rows = len(self.input_df.loc[self.input_df[col].isin(unused_categos)])
-        self.filtering_quick_gains.update(
-                {col: {
-                    'column': col,
-                    'dtype': self.slicing_cols[col],
-                    'filter_out': unused_categos,
-                    'useless_rows': unused_inputdf_rows,
-                    'weighted_benefit': unused_inputdf_rows - NATURAL_DIVIDER_THRESOLD*len(unused_categos)
-                }}
-        )
+        self.filtering_quick_gains.append({
+            'column': col,
+            'dtype': self.slicing_cols[col],
+            'filter_out': unused_categos,
+            'useless_rows': unused_inputdf_rows,
+            'weighted_benefit': unused_inputdf_rows - NATURAL_DIVIDER_THRESOLD*len(unused_categos)
+        })
         if len(unused_categos) > 100:
             logging.info(
                 "Found query optimizing chance in col: {}, reading ({}) unused rows, consider filtering out: {}".format(
@@ -284,34 +279,31 @@ class OneInputToFinalOptimization:
         category_potential = dict()
         for category in unused_categos:
             unused_rows_for_category = len(self.input_df.loc[self.input_df[col] == category])
-            category_potential.update({category, unused_rows_for_category})
-        return max(category_potential.iteritems(), key=operator.itemgetter(1))[0]
+            category_potential.update({category: unused_rows_for_category})
+        return max(category_potential.items(), key=operator.itemgetter(1))[0]
 
     def determine_best_slicing_col_filter(self):
         # two deciding factors: total number of rows that can be filtered (the larger the better),
         # the number of elements to filter out (the larger the worse)
-        efficiency_indicator_list = list()
-        for k, d_info in self.filtering_quick_gains.items():
-            efficiency_indicator_list.append((d_info['column'], d_info['weighted_benefit']))
-        max_weighted_benefit = max([x[1] for x in efficiency_indicator_list])
-        max_eficiency_potential_col = [item for item in efficiency_indicator_list if item[1] == max_weighted_benefit][0][0]
-        if self.filtering_quick_gains[max_eficiency_potential_col]['dtype'] != 'date':
-            category_to_filter = self.find_largest_unused_catego_in_column(max_eficiency_potential_col)
+        max_weighted_benefit = max([x['weighted_benefit'] for x in self.filtering_quick_gains])
+        max_eficiency_potential_info = [item for item in self.filtering_quick_gains if item['weighted_benefit'] == max_weighted_benefit][0]
+        if max_eficiency_potential_info['dtype'] != 'date':
+            category_to_filter = self.find_largest_unused_catego_in_column(max_eficiency_potential_info['column'])
             logging.info("The suggested column to filter is {}, recommended value to filter: {}".format(
-                max_eficiency_potential_col, category_to_filter
+                max_eficiency_potential_info['column'], category_to_filter
             ))
             self.best_filter = (
-                max_eficiency_potential_col,
+                max_eficiency_potential_info['column'],
                 category_to_filter,
-                self.filtering_quick_gains[max_eficiency_potential_col]['dtype']
+                max_eficiency_potential_info['dtype']
             )
         else:
             logging.info("The suggested column to filter is {}, recommended period to filter: {}".format(
-                max_eficiency_potential_col, self.filtering_quick_gains[max_eficiency_potential_col]['filter_out'][0]
+                max_eficiency_potential_info['column'], max_eficiency_potential_info['filter_out'][0]
             ))
             self.best_filter = (
-                max_eficiency_potential_col,
-                self.filtering_quick_gains[max_eficiency_potential_col]['filter_out'][1],
-                self.filtering_quick_gains[max_eficiency_potential_col]['dtype']
+                max_eficiency_potential_info['column'],
+                max_eficiency_potential_info['filter_out'][1],
+                max_eficiency_potential_info['dtype']
             )
-        logging.info("Full efficiency analisis: {}".format(efficiency_indicator_list))
+        logging.info("Full efficiency analisis: {}".format(self.filtering_quick_gains))
