@@ -157,8 +157,8 @@ class OneInputToFinalOptimization:
 
     def determine_date_range_filters(self, col):
         date_slices = {
-            'one_month_period': TODAY - datetime.timedelta(days=183),
-            'one_quarter_period': TODAY - datetime.timedelta(days=183),
+            'one_month_period': TODAY - datetime.timedelta(days=31),
+            'one_quarter_period': TODAY - datetime.timedelta(days=92),
             'six_months_period': TODAY - datetime.timedelta(days=183),
             'one_year_period': TODAY - datetime.timedelta(days=365),
             'mtd': datetime.date(TODAY.year, TODAY.month, 1),
@@ -168,19 +168,26 @@ class OneInputToFinalOptimization:
         non_na_inputdf = self.input_df.dropna(subset=[col])
         self.final_df[col] = pd.to_datetime(self.final_df[col])
         non_na_finaldf = self.final_df.dropna(subset=[col])
+        weighted_benefit = 0
         for period, date_ in date_slices.items():
             lesser_date_input = non_na_inputdf.loc[non_na_inputdf[col] < date_]
             if len(lesser_date_input) and col in self.final_df.columns:
                 lesser_date_final = non_na_finaldf.loc[non_na_finaldf[col] < date_]
-                if len(lesser_date_final) == 0:
+                if (len(lesser_date_final) == 0 and
+                    (len(lesser_date_input) - NATURAL_DIVIDER_THRESOLD*1) > weighted_benefit):
                     logging.info('Found query optimizing chance in col: {}, filter: {}'.format(col, period))
-                    self.filtering_quick_gains.append({
-                        'column': col,
-                        'dtype': 'date',
-                        'filter_out': (period, date_),
-                        'useless_rows': len(lesser_date_input),
-                        'weighted_benefit': len(lesser_date_input) - NATURAL_DIVIDER_THRESOLD*1
-                    })
+                    weighted_benefit = len(lesser_date_input) - NATURAL_DIVIDER_THRESOLD*1
+                    the_column = col
+                    filter_out = (period, date_)
+                    useless_rows = len(lesser_date_input)
+        if weighted_benefit > 0:
+            self.filtering_quick_gains.append({
+                'column': the_column,
+                'dtype': 'date',
+                'filter_out': filter_out,
+                'useless_rows': useless_rows,
+                'weighted_benefit': weighted_benefit
+            })
 
     def determine_category_col_filters(self, col):
         if self.usage_percentage[col] == 1:
