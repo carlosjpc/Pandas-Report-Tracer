@@ -1,38 +1,42 @@
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-
-    <!-- Bootstrap CSS -->
-    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+    <link rel="stylesheet" type="text/css" href="./styles.css">
+    
 </head>
 <body>
     <div class="container-fluid">
-        <h1>Inputs Analisis Report</h1>
+        <h1 style="text-align: center;">Inputs Analisis Report</h1>
     </div>
     <div class="container-fluid">
             <h2>Meta Information:</h2>
-            <h3>Result Filepath: {{ result_file }}%</h3>
+            <h3>Result Filepath: <span style="color: lightslategray;">{{ result_file }}</span> </h3>
             {% for file in input_files %}
-                <h3>Input Filepath: {{ file }}%</h3>
+                <h3>Input Filepath: <span style="color: lightslategray;">{{ file }}</span></h3>
             {% endfor %}
             <h4>Merging on:</h4>
             <ul>
             {% for column in merging_cols %}
-                <li> {{ column }} </li>
-            {% endfor %}
-            </ul>
-            <h4>Matching columns:</h4>
-            <ul>
-            {% for column in matching_columns %}
-                <li> {{ column }} </li>
+                <li style="color: lightslategray;"> {{ column }} </li>
             {% endfor %}
             </ul>
             <h4>Matching id columns:</h4>
             <ul>
             {% for column in matching_id_columns %}
-                <li> {{ column }} </li>
+                <li style="color: lightslategray;"> {{ column }} </li>
             {% endfor %}
             </ul>
+    </div>
+    <div class="container-fluid">
+        <h2 style="text-align: center;">Overall Assestment: {{ '%0.2f'|format(overall_percentage|float) }} </h2>
+        <p  style="text-align: center;">Closer to 1 is better, above 75% is good</p>
+    </div>
+    <div class="container-fluid">
+        <h2>Best Filter to Apply:</h2> 
+        <h3>
+            Column: <span style="color: lightslategray;">{{ best_filter[0] }} </span>;
+            Filter Out: <span style="color: lightslategray;">{{ best_filter[1] }} </span>;
+            Dtype: <span style="color: lightslategray;">{{ best_filter[2] }} </span>
+        </h3>
     </div>
     <div class="container-fluid">
             <h2>Columns usage</h2>
@@ -54,12 +58,17 @@
     <div class="container-fluid">
         {% for col in filtering_quick_gains %}
             <div class="container-fluid">
-                <h3>Results for {{ col['column'] }}, with dtype: {{ col['dtype'] }}; unused rows being read: {{ col['Useless rows'] }}.</h3>
-                {%- for column in col['filter out']|slice(4) %}
+                <h3>Column 
+                    <span style="color: lightslategray;">{{ col['column'] }}</span>, 
+                    with dtype: <span style="color: lightslategray;">{{ col['dtype'] }}</span>; 
+                    unused rows being read: <span style="color: lightslategray;">{{ col['useless_rows'] }}</span>.
+                </h3>
+                <h4>Filter out:</h4>
+                {%- for column in col['filter_out']|slice(2) %}
                 <div class="container">
                     <ul class="column-{{ loop.index }}">
                     {%- for item in column %}
-                        <li>{{ item }}</li>
+                        <li style="color: lightslategray;"> {{ item }}</li>
                     {%- endfor %}
                     </ul>
                 </div>

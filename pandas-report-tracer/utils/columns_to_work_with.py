@@ -4,6 +4,7 @@ import itertools
 import logging
 import operator
 import random
+import statistics
 
 from functools import reduce
 
@@ -19,7 +20,35 @@ logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 
+def analyze_one_input_to_result(one_input_to_final):
+    """
+    Parameters:
+    one_input_to_final (object): an object of the class OneInputToFinalOptimization
+    """
+    logging.info("Starting Analisis")
+    one_input_to_final.find_matching_cols()
+    if one_input_to_final.matching_cols.empty:
+        logging.warning('Without shared columns this tool is worthless, consider renaming columns')
+        return
+    one_input_to_final.final_df_to_work_with()
+    one_input_to_final.columns_usage_percentage()
+    logging.info("Column usage percentage:")
+    logging.info(one_input_to_final.usage_percentage)
+    one_input_to_final.set_slicing_cols()
+    logging.info("Slicing cols:")
+    logging.info(one_input_to_final.slicing_cols)
+    for slicing_col, dtype in one_input_to_final.slicing_cols.items():
+        if 'date' in dtype:
+            one_input_to_final.determine_date_range_filters(slicing_col)
+        else:
+            one_input_to_final.determine_category_col_filters(slicing_col)
+    one_input_to_final.determine_possible_multi_column_filters()
+    one_input_to_final.determine_multi_column_filters()
+    one_input_to_final.determine_best_slicing_col_filter()
+
+
 class OneInputToFinalOptimization:
+    best_filter = tuple()
     combos_to_check_in_final = list()
     extended_resulting_df = pd.DataFrame()
     input_df = pd.DataFrame()
@@ -33,30 +62,10 @@ class OneInputToFinalOptimization:
     usage_percentage = dict()
 
     def __init__(self, input_df, resulting_df, merging_cols=None):
-        logging.info("Starting Analisis")
         self.input_df = input_df
         self.resulting_df = resulting_df
         self.input_df_cols = input_df.columns
         self.merging_cols = merging_cols
-        self.find_matching_cols()
-        if self.matching_cols.empty:
-            logging.warning('Without shared columns this tool is worthless, consider renaming columns')
-            return
-        self.final_df_to_work_with()
-        self.columns_usage_percentage()
-        logging.info("Column usage percentage:")
-        logging.info(self.usage_percentage)
-        self.set_slicing_cols()
-        logging.info("Slicing cols:")
-        logging.info(self.slicing_cols)
-        for slicing_col, dtype in self.slicing_cols.items():
-            if 'date' in dtype:
-                self.determine_date_range_filters(slicing_col)
-            else:
-                self.determine_category_col_filters(slicing_col)
-        self.determine_possible_multi_column_filters()
-        self.determine_multi_column_filters()
-        self.determine_best_slicing_col_filter()
 
     def find_matching_cols(self):
         # to identify a column for merge it must contain 'id' or 'Id'
@@ -107,6 +116,7 @@ class OneInputToFinalOptimization:
             else:
                 percentage = len(matching_rows) / len(self.input_df[col].unique())
             self.usage_percentage.update({col: percentage})
+        self.overall_percentage = statistics.mean(self.usage_percentage.values())
 
     def set_slicing_cols(self):
         for col in self.input_df.columns:
