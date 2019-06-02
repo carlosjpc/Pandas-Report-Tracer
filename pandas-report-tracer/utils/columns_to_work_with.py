@@ -14,10 +14,25 @@ from pandas.api.types import is_string_dtype, is_integer_dtype, is_bool_dtype
 NATURAL_DIVIDER_THRESOLD = 30
 MULTIPLE_COMBINATION_FILTERS = 5000
 MULTI_COL_FILTER_RATIO = 0.05
-TODAY = datetime.date(2019,4,1)
+TODAY = datetime.date(2019, 4, 1)
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
+
+
+def filter_and_save_inputfile(result_ob, input_file_name):
+    # filter input DF with best filter found in analisis
+    if result_ob.best_filter[2] == 'date':
+        nan_rows = result_ob.input_df.loc[result_ob.input_df[result_ob.best_filter[0]].isnull()]
+        result_ob.input_df = result_ob.input_df.loc[
+            result_ob.input_df[result_ob.best_filter[0]] > result_ob.best_filter[1]
+        ]
+        result_ob.input_df = pd.concat([result_ob.input_df, nan_rows])
+    else:
+        result_ob.input_df = result_ob.input_df.loc[
+            result_ob.input_df[result_ob.best_filter[0]] != result_ob.best_filter[1]
+        ]
+    result_ob.input_df.to_csv(input_file_name, index=False, encoding='utf-8', escapechar='\\')
 
 
 def analyze_one_input_to_result(one_input_to_final):
@@ -314,7 +329,8 @@ class OneInputToFinalOptimization:
             self.best_filter = (
                 max_eficiency_potential_info['column'],
                 category_to_filter,
-                max_eficiency_potential_info['dtype']
+                max_eficiency_potential_info['dtype'],
+                max_eficiency_potential_info['excpeted_unused_rows_per_catego'],
             )
         else:
             logging.info("The suggested column to filter is {}, recommended period to filter: {}".format(
@@ -322,7 +338,9 @@ class OneInputToFinalOptimization:
             ))
             self.best_filter = (
                 max_eficiency_potential_info['column'],
-                max_eficiency_potential_info['filter_out'][1],
-                max_eficiency_potential_info['dtype']
+                max_eficiency_potential_info['filter_out'],
+                max_eficiency_potential_info['dtype'],
+                max_eficiency_potential_info['weighted_benefit'],
+                len(self.input_df) / max_eficiency_potential_info['weighted_benefit']
             )
         logging.info("Full efficiency analisis: {}".format(self.filtering_quick_gains))

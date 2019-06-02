@@ -14,7 +14,7 @@
                 <h3>Input Filepath: <span style="color: lightslategray;">{{ file }}</span></h3>
             {% endfor %}
             <h4>Merging on:</h4>
-            <ul>
+            <ul style="list-style-type: none;">
             {% for column in merging_cols %}
                 <li style="color: lightslategray;"> {{ column }} </li>
             {% endfor %}
@@ -36,6 +36,10 @@
             Column: <span style="color: lightslategray;">{{ best_filter[0] }} </span>;
             Filter Out: <span style="color: lightslategray;">{{ best_filter[1] }} </span>;
             Dtype: <span style="color: lightslategray;">{{ best_filter[2] }} </span>
+        </h3>
+        <h3>
+            Number of rows that would be filtered out: <span style="color: lightslategray;">{{ best_filter[3] }} </span>;
+            percentage: <span style="color: lightslategray;">{{ best_filter[4] }} </span>
         </h3>
     </div>
     <div class="container-fluid">
@@ -66,7 +70,7 @@
                 <h4>Filter out:</h4>
                 {%- for column in col['filter_out']|slice(2) %}
                 <div class="container">
-                    <ul class="column-{{ loop.index }}">
+                    <ul class="column-{{ loop.index }}"  style="list-style-type: none;">
                     {%- for item in column %}
                         <li style="color: lightslategray;"> {{ item }}</li>
                     {%- endfor %}
