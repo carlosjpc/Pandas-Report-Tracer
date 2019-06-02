@@ -42,8 +42,8 @@ def analyze_one_input_to_result(one_input_to_final):
             one_input_to_final.determine_date_range_filters(slicing_col)
         else:
             one_input_to_final.determine_category_col_filters(slicing_col)
-    one_input_to_final.determine_possible_multi_column_filters()
-    one_input_to_final.determine_multi_column_filters()
+    # one_input_to_final.determine_possible_multi_column_filters()
+    # one_input_to_final.determine_multi_column_filters()
     one_input_to_final.determine_best_slicing_col_filter()
 
 
@@ -113,6 +113,8 @@ class OneInputToFinalOptimization:
             if not matching_rows:
                 logging.info('{} is in both DFs, but no matching data was found'.format(col))
                 percentage = 0
+                if col in self.merging_cols:
+                    raise ValueError('No keys to perform merge')
             else:
                 percentage = len(matching_rows) / len(self.input_df[col].unique())
             self.usage_percentage.update({col: percentage})
@@ -121,7 +123,7 @@ class OneInputToFinalOptimization:
     def set_slicing_cols(self):
         for col in self.input_df.columns:
             if 'date' in col or 'Date' in col:
-                if self.convert_input_col_to_date(col):
+                if self.convert_str_col_to_date(col):
                     self.slicing_cols.update({col: 'date'})
             elif is_string_dtype(self.input_df[col]):
                 if self.is_natural_divider(self.input_df[col]):
@@ -170,13 +172,12 @@ class OneInputToFinalOptimization:
         non_na_finaldf = self.final_df.dropna(subset=[col])
         weighted_benefit = 0
         for period, date_ in date_slices.items():
-            lesser_date_input = non_na_inputdf.loc[non_na_inputdf[col] < date_]
-            if len(lesser_date_input) and col in self.final_df.columns:
-                lesser_date_final = non_na_finaldf.loc[non_na_finaldf[col] < date_]
-                if (len(lesser_date_final) == 0 and
-                    (len(lesser_date_input) - NATURAL_DIVIDER_THRESOLD*1) > weighted_benefit):
+            lesser_date_final = non_na_finaldf.loc[non_na_finaldf[col] < date_]
+            if not len(lesser_date_final):
+                lesser_date_input = non_na_inputdf.loc[non_na_inputdf[col] < date_]
+                if len(lesser_date_input) > weighted_benefit:
                     logging.info('Found query optimizing chance in col: {}, filter: {}'.format(col, period))
-                    weighted_benefit = len(lesser_date_input) - NATURAL_DIVIDER_THRESOLD*1
+                    weighted_benefit = len(lesser_date_input)
                     the_column = col
                     filter_out = (period, date_)
                     useless_rows = len(lesser_date_input)
@@ -194,12 +195,13 @@ class OneInputToFinalOptimization:
             return
         unused_categos = set(self.input_df[col].unique()) - set(self.final_df[col].unique())
         unused_inputdf_rows = len(self.input_df.loc[self.input_df[col].isin(unused_categos)])
+        excpeted_unused_rows_per_catego = unused_inputdf_rows / len(unused_categos)
         self.filtering_quick_gains.append({
             'column': col,
             'dtype': self.slicing_cols[col],
             'filter_out': unused_categos,
             'useless_rows': unused_inputdf_rows,
-            'weighted_benefit': unused_inputdf_rows - NATURAL_DIVIDER_THRESOLD*len(unused_categos)
+            'weighted_benefit': excpeted_unused_rows_per_catego
         })
         if len(unused_categos) > 100:
             logging.info(
@@ -284,7 +286,7 @@ class OneInputToFinalOptimization:
             number_of_combinations = reduce(lambda x, y: x*y, slicing_cols_unique_length.values())
         self.catego_cols = list(slicing_cols_unique_length.keys())
 
-    def convert_input_col_to_date(self, col_name):
+    def convert_str_col_to_date(self, col_name):
         try:
             self.input_df[col_name] = pd.to_datetime(self.input_df[col_name])
         except Exception:
@@ -302,8 +304,8 @@ class OneInputToFinalOptimization:
     def determine_best_slicing_col_filter(self):
         # two deciding factors: total number of rows that can be filtered (the larger the better),
         # the number of elements to filter out (the larger the worse)
-        max_weighted_benefit = max([x['weighted_benefit'] for x in self.filtering_quick_gains])
-        max_eficiency_potential_info = [item for item in self.filtering_quick_gains if item['weighted_benefit'] == max_weighted_benefit][0]
+        self.max_weighted_benefit = max([x['weighted_benefit'] for x in self.filtering_quick_gains])
+        max_eficiency_potential_info = [item for item in self.filtering_quick_gains if item['weighted_benefit'] == self.max_weighted_benefit][0]
         if max_eficiency_potential_info['dtype'] != 'date':
             category_to_filter = self.find_largest_unused_catego_in_column(max_eficiency_potential_info['column'])
             logging.info("The suggested column to filter is {}, recommended value to filter: {}".format(

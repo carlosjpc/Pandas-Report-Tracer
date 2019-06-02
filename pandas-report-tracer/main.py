@@ -10,6 +10,7 @@ import pandas as pd
 from plotly.offline import plot
 import plotly.graph_objs as go
 
+from filter_one_input import filter_and_save_inputfile
 from utils.columns_to_work_with import OneInputToFinalOptimization, analyze_one_input_to_result
 
 INPUT_PATH = "/tmp/input"
@@ -65,3 +66,5 @@ if __name__ == "__main__":
         )]
         data_usage_plot = plot(usage_data, auto_open=False, output_type='div')
         print_report(x, filenames[0], result_file[0], data_usage_plot)
+        if 1 == 1:
+            filter_and_save_inputfile(input_df, x, csv_file)
