@@ -23,7 +23,7 @@ def print_report(obj, input_file, result_file, data_usage_plot):
         result_file=result_file
     )
     now = datetime.datetime.now()
-    html_file = open('/tmp/report_results_{}.html'.format(now.strftime("%d/%m/%Y %H:%M:%S")), 'w')
+    html_file = open('/tmp/report_results_{}.html'.format(now.strftime("%d%m%Y_%H-%M-%S")), 'w')
     html_file.write(outputText)
     html_file.close()
 

@@ -25,7 +25,7 @@ def filter_and_save_inputfile(result_ob, input_file_name):
     if result_ob.best_filter[2] == 'date':
         nan_rows = result_ob.input_df.loc[result_ob.input_df[result_ob.best_filter[0]].isnull()]
         result_ob.input_df = result_ob.input_df.loc[
-            result_ob.input_df[result_ob.best_filter[0]] > result_ob.best_filter[1]
+            result_ob.input_df[result_ob.best_filter[0]] > result_ob.best_filter[1][1]
         ]
         result_ob.input_df = pd.concat([result_ob.input_df, nan_rows])
     else:
@@ -57,30 +57,22 @@ def analyze_one_input_to_result(one_input_to_final):
             one_input_to_final.determine_date_range_filters(slicing_col)
         else:
             one_input_to_final.determine_category_col_filters(slicing_col)
-    # one_input_to_final.determine_possible_multi_column_filters()
-    # one_input_to_final.determine_multi_column_filters()
+    one_input_to_final.determine_possible_multi_column_filters()
+    one_input_to_final.determine_multi_column_filters()
     one_input_to_final.determine_best_slicing_col_filter()
 
 
 class OneInputToFinalOptimization:
-    best_filter = tuple()
-    combos_to_check_in_final = list()
-    extended_resulting_df = pd.DataFrame()
-    input_df = pd.DataFrame()
-    input_df_cols = list()
-    filtering_quick_gains = list()
-    matching_cols = set()
-    matching_id_cols = list()
-    merging_cols = list()
-    resulting_df = pd.DataFrame()
-    slicing_cols = dict()
-    usage_percentage = dict()
 
     def __init__(self, input_df, resulting_df, merging_cols=None):
         self.input_df = input_df
         self.resulting_df = resulting_df
         self.input_df_cols = input_df.columns
         self.merging_cols = merging_cols
+        self.combos_to_check_in_final = list()
+        self.filtering_quick_gains = list()
+        self.slicing_cols = dict()
+        self.usage_percentage = dict()
 
     def find_matching_cols(self):
         # to identify a column for merge it must contain 'id' or 'Id'

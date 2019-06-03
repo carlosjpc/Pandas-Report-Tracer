@@ -5,7 +5,6 @@ import glob
 
 import pandas as pd
 
-from filter_one_input import filter_and_save_inputfile
 from utils.columns_to_work_with import OneInputToFinalOptimization, analyze_one_input_to_result
 from utils.report_generation import generate_data_usage_plot, print_report
 
@@ -35,5 +34,3 @@ if __name__ == "__main__":
 
         data_usage_plot = generate_data_usage_plot(x)
         print_report(x, filenames[0], result_file[0], data_usage_plot)
-        if 1 == 1:
-            filter_and_save_inputfile(input_df, x, csv_file)
