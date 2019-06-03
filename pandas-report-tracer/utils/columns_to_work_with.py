@@ -63,6 +63,14 @@ def analyze_one_input_to_result(one_input_to_final):
 
 
 class OneInputToFinalOptimization:
+    date_slices = {
+        'one_month_period': TODAY - datetime.timedelta(days=31),
+        'one_quarter_period': TODAY - datetime.timedelta(days=92),
+        'six_months_period': TODAY - datetime.timedelta(days=183),
+        'one_year_period': TODAY - datetime.timedelta(days=365),
+        'mtd': datetime.date(TODAY.year, TODAY.month, 1),
+        'ytd': datetime.date(TODAY.year, 1, 1)
+    }
 
     def __init__(self, input_df, resulting_df, merging_cols=None):
         self.input_df = input_df
@@ -165,20 +173,23 @@ class OneInputToFinalOptimization:
             })
 
     def determine_date_range_filters(self, col):
-        date_slices = {
-            'one_month_period': TODAY - datetime.timedelta(days=31),
-            'one_quarter_period': TODAY - datetime.timedelta(days=92),
-            'six_months_period': TODAY - datetime.timedelta(days=183),
-            'one_year_period': TODAY - datetime.timedelta(days=365),
-            'mtd': datetime.date(TODAY.year, TODAY.month, 1),
-            'ytd': datetime.date(TODAY.year, 1, 1)
-        }
+        """For each of the time ranges determined in the 'date_slices' class dictionary this functions checks if
+        there is data in the 'final_df' if not it continues with the next date range, otherwise it checks if there is
+        data for that same date range in the 'input_df', if so, there is un needed rows in the 'input_df' that should
+        be filtered. That information is stored in function variables to determine the best date range filter that can
+        be applied to that column, that information is stored in a dictionary and appended to 'filtering_quick_gains'
+        an instance list.
+
+        Parameters:
+        col (string): the name of a column in the 'input_df'
+        Returns None
+        """
         self.handle_na_in_date_cols(col)
         non_na_inputdf = self.input_df.dropna(subset=[col])
         self.final_df[col] = pd.to_datetime(self.final_df[col])
         non_na_finaldf = self.final_df.dropna(subset=[col])
         weighted_benefit = 0
-        for period, date_ in date_slices.items():
+        for period, date_ in self.date_slices.items():
             lesser_date_final = non_na_finaldf.loc[non_na_finaldf[col] < date_]
             if not len(lesser_date_final):
                 lesser_date_input = non_na_inputdf.loc[non_na_inputdf[col] < date_]
@@ -198,6 +209,14 @@ class OneInputToFinalOptimization:
             })
 
     def determine_category_col_filters(self, col):
+        """If a columns 'col' unique values are not fully present in the 'final_df' this function determines the
+        unique values in the 'input_df' for the column 'col' not present in the 'resulting_df' / 'final_df' and
+        adds that information to a instance dictionary for further analysis
+
+        Parameters:
+        col (string): the name of a column in the 'input_df'
+        Returns None
+        """
         if self.usage_percentage[col] == 1:
             return
         unused_categos = set(self.input_df[col].unique()) - set(self.final_df[col].unique())
@@ -221,11 +240,27 @@ class OneInputToFinalOptimization:
 
     @staticmethod
     def isin_row(row, df):
+        """Given a 'row' (specific combination of values for the DF columns) this function searches the 'df'
+        for that same combination of values, return True if the 'df' has that exact combination, False if otherwise.
+
+        Parameters:
+        row (DataFrame): Dataframe with a single row
+        df (DataFrame): Dataframe where the row is searched
+        Returns boolean
+        """
         cols = df.columns
         bool_series = functools.reduce(lambda x, y: x & y, [df[col].isin(row[col]) for col in cols])
         return bool_series.any()
 
     def combo_appears_often_in_input(self, row, input_catego_df):
+        """Given a combination of values for the columns in 'catego_cols' this function weights the amount
+        of appearences in relation to the 'input_df' to determine if a filter excluding this combination is valuable.
+
+        Parameters:
+        row (DataFrame): Dataframe with a single row
+        input_catego_df (DataFrame): a DataFrame grouped by columns in 'catego_cols'
+        Returns boolean
+        """
         df = input_catego_df.get_group(row)
         multi_col_filter_ratio = len(df) / len(self.input_df)
         if multi_col_filter_ratio > MULTI_COL_FILTER_RATIO:
