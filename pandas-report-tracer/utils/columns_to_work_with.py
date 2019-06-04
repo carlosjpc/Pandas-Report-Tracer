@@ -21,6 +21,15 @@ logger.setLevel(logging.INFO)
 
 
 def filter_and_save_inputfile(result_ob, input_file_name):
+    """Applies the best filter, result of running 'analyze_one_input_to_result' to the input_df and saves it,
+    replacing the original file.
+
+    Parameters:
+    result_ob (object): an object of the class OneInputToFinalOptimization
+    input_file_name (string): the path and name of the input csv
+    Returns:
+    None
+    """
     # filter input DF with best filter found in analisis
     if result_ob.best_filter[2] == 'date':
         nan_rows = result_ob.input_df.loc[result_ob.input_df[result_ob.best_filter[0]].isnull()]
@@ -36,9 +45,13 @@ def filter_and_save_inputfile(result_ob, input_file_name):
 
 
 def analyze_one_input_to_result(one_input_to_final):
-    """
+    """Runs functions of the class OneInputToFinalOptimization on an object of the class to get the best single
+    column filter while also generating the data for the 'print_report' and 'generate_data_usage_plot'.
+
     Parameters:
     one_input_to_final (object): an object of the class OneInputToFinalOptimization
+    Returns:
+    None
     """
     logging.info("Starting Analisis")
     one_input_to_final.find_matching_cols()
@@ -83,6 +96,15 @@ class OneInputToFinalOptimization:
         self.usage_percentage = dict()
 
     def find_matching_cols(self):
+        """Compares the columns in 'input_df' and 'resulting_df' to find columns present in both DF, a second list is
+        colculated for columns also having id or Id in their name, to be used for merging the DFs if no mergin list is
+        provided.
+
+        Parameters:
+        None
+        Returns:
+        None
+        """
         # to identify a column for merge it must contain 'id' or 'Id'
         self.matching_cols = set(self.input_df.columns).intersection(self.resulting_df.columns)
         self.matching_id_cols = [col_name for col_name in self.matching_cols if 'id' in col_name or 'Id' in col_name]
@@ -99,6 +121,14 @@ class OneInputToFinalOptimization:
             logging.warning('The input df could not be merged into final, that decreases the chances of success')
 
     def merge_input_to_final(self):
+        """Merges the 'input_df' to 'final_df', if a list of columns was passed to the instance the merge is executed
+        on those columns, otherwise on all 'matching_id_cols'
+
+        Parameters:
+        None
+        Returns:
+        None
+        """
         if self.merging_cols:
             input_df_cols = list((set(self.input_df.columns) - self.matching_cols))
             self.extended_resulting_df = self.resulting_df.merge(
@@ -113,14 +143,29 @@ class OneInputToFinalOptimization:
                 )
 
     def final_df_to_work_with(self):
+        """Checks if the 'input_df' was merged to 'final_df', to work with that merged DF, which increases the scope
+        of the analysis because all columns are considered, otherwise only the 'matching cols'.
+
+        Parameters:
+        None
+        Returns:
+        None
+        """
         if not self.extended_resulting_df.empty:
             self.final_df = self.extended_resulting_df
         else:
             self.final_df = self.resulting_df
 
     def columns_usage_percentage(self):
-        # the lower the percentage the more file you are reading in vain
-        # a MySQL query adjustment or a reading the table using Athena would increase speed
+        """Preliminary analysis that measure the ratio of unique values in 'input_df' that make it to the 'final_df',
+        the lower the percentage the more file you are reading in vain, in that case a MySQL query adjustment or
+        reading the table using Athena to filter a bucket would increase speed.
+
+        Parameters:
+        None
+        Returns:
+        None
+        """
         for col in self.matching_cols:
             if 'date' in col or is_bool_dtype(self.input_df[col]):
                 pass
@@ -136,6 +181,14 @@ class OneInputToFinalOptimization:
         self.overall_percentage = statistics.mean(self.usage_percentage.values())
 
     def set_slicing_cols(self):
+        """For each column in 'input_df' determine its dtype (many columns have dtype object which is not useful
+        for this analysis). And add to a dictionary if 'is_natural_divider'
+
+        Parameters:
+        None
+        Returns:
+        None
+        """
         for col in self.input_df.columns:
             if 'date' in col or 'Date' in col:
                 if self.convert_str_col_to_date(col):
@@ -151,6 +204,14 @@ class OneInputToFinalOptimization:
 
     @staticmethod
     def is_natural_divider(df_series):
+        """Determines if a column of the 'input_df' would serve as a good filter, if the ratio of unique values to
+        the number of rows is high the column is consider a 'natural divider'
+
+        Parameters:
+        df_series (pandas series): series to be checked to see if it is a 'natural divider'
+        Returns:
+        Boolean
+        """
         # if a string or int column can be used as divider
         unique_rows = len(df_series.unique())
         total_rows = len(df_series)
@@ -161,6 +222,15 @@ class OneInputToFinalOptimization:
             return 1
 
     def handle_na_in_date_cols(self, col):
+        """This function checks for nans values in the 'input_df' DF for a given column, if there are such values
+        in the 'input_df' but not in the 'final_df' it has found a valuable filter. It adds that finding to the
+        'filtering_quick_gains' list.
+
+        Parameters:
+        col (string): the name of a column in the 'input_df'
+        Returns:
+        None
+        """
         number_of_nans = self.input_df[col].isna().sum()
         if number_of_nans and self.final_df[col].isna().sum() == 0:
             logging.info('Found query optimizing chance in col: {}, filter: nan'.format(col))
@@ -169,7 +239,7 @@ class OneInputToFinalOptimization:
                 'dtype': 'date',
                 'filter_out': 'nan',
                 'useless_rows': number_of_nans,
-                'weighted_benefit': number_of_nans - NATURAL_DIVIDER_THRESOLD*1
+                'weighted_benefit': number_of_nans
             })
 
     def determine_date_range_filters(self, col):
@@ -182,7 +252,8 @@ class OneInputToFinalOptimization:
 
         Parameters:
         col (string): the name of a column in the 'input_df'
-        Returns None
+        Returns:
+        None
         """
         self.handle_na_in_date_cols(col)
         non_na_inputdf = self.input_df.dropna(subset=[col])
@@ -215,7 +286,8 @@ class OneInputToFinalOptimization:
 
         Parameters:
         col (string): the name of a column in the 'input_df'
-        Returns None
+        Returns:
+        None
         """
         if self.usage_percentage[col] == 1:
             return
@@ -246,7 +318,8 @@ class OneInputToFinalOptimization:
         Parameters:
         row (DataFrame): Dataframe with a single row
         df (DataFrame): Dataframe where the row is searched
-        Returns boolean
+        Returns:
+        boolean
         """
         cols = df.columns
         bool_series = functools.reduce(lambda x, y: x & y, [df[col].isin(row[col]) for col in cols])
@@ -259,7 +332,8 @@ class OneInputToFinalOptimization:
         Parameters:
         row (DataFrame): Dataframe with a single row
         input_catego_df (DataFrame): a DataFrame grouped by columns in 'catego_cols'
-        Returns boolean
+        Returns:
+        boolean
         """
         df = input_catego_df.get_group(row)
         multi_col_filter_ratio = len(df) / len(self.input_df)
