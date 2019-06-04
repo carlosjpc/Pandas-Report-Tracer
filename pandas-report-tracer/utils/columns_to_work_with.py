@@ -86,12 +86,17 @@ class OneInputToFinalOptimization:
     }
 
     def __init__(self, input_df, resulting_df, merging_cols=None):
-        self.input_df = input_df
-        self.resulting_df = resulting_df
-        self.input_df_cols = input_df.columns
-        self.merging_cols = merging_cols
+        self.catego_cols = list()
         self.combos_to_check_in_final = list()
+        self.combos_to_exclude = pd.DataFrame()
+        self.extended_resulting_df = pd.DataFrame()
         self.filtering_quick_gains = list()
+        self.input_df = input_df
+        self.input_df_cols = input_df.columns
+        self.matching_cols = list()
+        self.matching_id_cols = list()
+        self.merging_cols = merging_cols
+        self.resulting_df = resulting_df
         self.slicing_cols = dict()
         self.usage_percentage = dict()
 
@@ -100,10 +105,6 @@ class OneInputToFinalOptimization:
         colculated for columns also having id or Id in their name, to be used for merging the DFs if no mergin list is
         provided.
 
-        Parameters:
-        None
-        Returns:
-        None
         """
         # to identify a column for merge it must contain 'id' or 'Id'
         self.matching_cols = set(self.input_df.columns).intersection(self.resulting_df.columns)
@@ -124,10 +125,6 @@ class OneInputToFinalOptimization:
         """Merges the 'input_df' to 'final_df', if a list of columns was passed to the instance the merge is executed
         on those columns, otherwise on all 'matching_id_cols'
 
-        Parameters:
-        None
-        Returns:
-        None
         """
         if self.merging_cols:
             input_df_cols = list((set(self.input_df.columns) - self.matching_cols))
@@ -146,10 +143,6 @@ class OneInputToFinalOptimization:
         """Checks if the 'input_df' was merged to 'final_df', to work with that merged DF, which increases the scope
         of the analysis because all columns are considered, otherwise only the 'matching cols'.
 
-        Parameters:
-        None
-        Returns:
-        None
         """
         if not self.extended_resulting_df.empty:
             self.final_df = self.extended_resulting_df
@@ -161,10 +154,6 @@ class OneInputToFinalOptimization:
         the lower the percentage the more file you are reading in vain, in that case a MySQL query adjustment or
         reading the table using Athena to filter a bucket would increase speed.
 
-        Parameters:
-        None
-        Returns:
-        None
         """
         for col in self.matching_cols:
             if 'date' in col or is_bool_dtype(self.input_df[col]):
@@ -184,10 +173,6 @@ class OneInputToFinalOptimization:
         """For each column in 'input_df' determine its dtype (many columns have dtype object which is not useful
         for this analysis). And add to a dictionary if 'is_natural_divider'
 
-        Parameters:
-        None
-        Returns:
-        None
         """
         for col in self.input_df.columns:
             if 'date' in col or 'Date' in col:
@@ -207,10 +192,8 @@ class OneInputToFinalOptimization:
         """Determines if a column of the 'input_df' would serve as a good filter, if the ratio of unique values to
         the number of rows is high the column is consider a 'natural divider'
 
-        Parameters:
-        df_series (pandas series): series to be checked to see if it is a 'natural divider'
-        Returns:
-        Boolean
+        :param df_series: (pandas series) series to be checked to see if it is a 'natural divider'
+        :return: Boolean
         """
         # if a string or int column can be used as divider
         unique_rows = len(df_series.unique())
@@ -226,10 +209,7 @@ class OneInputToFinalOptimization:
         in the 'input_df' but not in the 'final_df' it has found a valuable filter. It adds that finding to the
         'filtering_quick_gains' list.
 
-        Parameters:
-        col (string): the name of a column in the 'input_df'
-        Returns:
-        None
+        :param col: (str) the name of the column in the 'input_df'
         """
         number_of_nans = self.input_df[col].isna().sum()
         if number_of_nans and self.final_df[col].isna().sum() == 0:
@@ -250,10 +230,7 @@ class OneInputToFinalOptimization:
         be applied to that column, that information is stored in a dictionary and appended to 'filtering_quick_gains'
         an instance list.
 
-        Parameters:
-        col (string): the name of a column in the 'input_df'
-        Returns:
-        None
+        :param col: (str) the name of the column in the 'input_df'
         """
         self.handle_na_in_date_cols(col)
         non_na_inputdf = self.input_df.dropna(subset=[col])
@@ -284,22 +261,19 @@ class OneInputToFinalOptimization:
         unique values in the 'input_df' for the column 'col' not present in the 'resulting_df' / 'final_df' and
         adds that information to a instance dictionary for further analysis
 
-        Parameters:
-        col (string): the name of a column in the 'input_df'
-        Returns:
-        None
+        :param col: (str) the name of the column in the 'input_df'
         """
         if self.usage_percentage[col] == 1:
             return
         unused_categos = set(self.input_df[col].unique()) - set(self.final_df[col].unique())
         unused_inputdf_rows = len(self.input_df.loc[self.input_df[col].isin(unused_categos)])
-        excpeted_unused_rows_per_catego = unused_inputdf_rows / len(unused_categos)
+        expected_unused_rows_per_catego = unused_inputdf_rows / len(unused_categos)
         self.filtering_quick_gains.append({
             'column': col,
             'dtype': self.slicing_cols[col],
             'filter_out': unused_categos,
             'useless_rows': unused_inputdf_rows,
-            'weighted_benefit': excpeted_unused_rows_per_catego
+            'weighted_benefit': expected_unused_rows_per_catego
         })
         if len(unused_categos) > 100:
             logging.info(
@@ -315,11 +289,9 @@ class OneInputToFinalOptimization:
         """Given a 'row' (specific combination of values for the DF columns) this function searches the 'df'
         for that same combination of values, return True if the 'df' has that exact combination, False if otherwise.
 
-        Parameters:
-        row (DataFrame): Dataframe with a single row
-        df (DataFrame): Dataframe where the row is searched
-        Returns:
-        boolean
+        :param row: (DataFrame) single row df
+        :param df: (DataFrame) df where the row is searched
+        :return: Boolean
         """
         cols = df.columns
         bool_series = functools.reduce(lambda x, y: x & y, [df[col].isin(row[col]) for col in cols])
@@ -329,11 +301,9 @@ class OneInputToFinalOptimization:
         """Given a combination of values for the columns in 'catego_cols' this function weights the amount
         of appearences in relation to the 'input_df' to determine if a filter excluding this combination is valuable.
 
-        Parameters:
-        row (DataFrame): Dataframe with a single row
-        input_catego_df (DataFrame): a DataFrame grouped by columns in 'catego_cols'
-        Returns:
-        boolean
+        :param row: (DataFrame) single row df
+        :param input_catego_df: (DataFrame): a DataFrame grouped by columns in 'catego_cols'
+        :return: Boolean
         """
         df = input_catego_df.get_group(row)
         multi_col_filter_ratio = len(df) / len(self.input_df)
@@ -343,6 +313,10 @@ class OneInputToFinalOptimization:
             return 0
 
     def determine_possible_multi_column_filters(self):
+        """For the values / columns combinations generated using 'generate_possible_combinations', check if the
+        combination exists in the 'input_df'.
+
+        """
         combinations_generator = self.generate_possible_combinations()
         input_catego_df = self.input_df[self.catego_cols].drop_duplicates()
         for combo in combinations_generator:
@@ -351,6 +325,9 @@ class OneInputToFinalOptimization:
                 self.combos_to_check_in_final.append((combo_row_df, combo))
 
     def generate_possible_combinations(self):
+        """For the columns in the 'catego_cols' list calculate all possible combinations of the columns unique values
+
+        """
         lists_for_prod = list()
         if self.use_all_slicing_cols_as_catego_cols():
             self.catego_cols = self.slicing_cols
@@ -359,11 +336,15 @@ class OneInputToFinalOptimization:
         logging.info("Category Columns:")
         logging.info(self.catego_cols)
         for col in self.catego_cols:
-            unique_rows = list(self.input_df[col].unique())
-            lists_for_prod.append(unique_rows)
+            unique_values = list(self.input_df[col].unique())
+            lists_for_prod.append(unique_values)
         return itertools.product(*lists_for_prod)
 
     def determine_multi_column_filters(self):
+        """For the values / columns combinations already generated and found in 'input_df' check that is exists in
+        the 'final_df' and that it appears often, if so it is added to a DF for post in the report.
+
+        """
         final_catego_df = self.final_df[self.catego_cols].drop_duplicates()
         input_catego_df = self.input_df.groupby(self.catego_cols)
         combos_to_exclude = list()
@@ -383,7 +364,12 @@ class OneInputToFinalOptimization:
         logging.info(self.combos_to_exclude)
 
     def use_all_slicing_cols_as_catego_cols(self):
-        # because this will be used to generate combinations (which grow quiet fast) we need to be more careful
+        """Checks that the number of combinations to try as multiple column filter is less than:
+        'MULTIPLE_COMBINATION_FILTERS' if all columns in 'slicing_cols' are considered. Because combinations
+        grow quiet fast we need to be more careful.
+
+        :return: Boolean
+        """
         number_of_combinations = 1
         for col in self.slicing_cols:
             number_of_combinations *= len(self.input_df[col].unique())
@@ -392,6 +378,11 @@ class OneInputToFinalOptimization:
         return 1
 
     def set_catego_columns(self):
+        """If the number of combinations is larger than 'MULTIPLE_COMBINATION_FILTERS' in take out the column with the
+        must unique values and calculate the number of combinations again, until the number is bellow the threshold.
+
+        :return:
+        """
         slicing_cols_unique_length = dict()
         for col in self.slicing_cols:
             slicing_cols_unique_length.update({col: len(self.input_df[col].unique())})
@@ -403,13 +394,23 @@ class OneInputToFinalOptimization:
         self.catego_cols = list(slicing_cols_unique_length.keys())
 
     def convert_str_col_to_date(self, col_name):
+        """Tries to convert a column to dtype datetime64.
+
+        :param col_name: (str) the name of the column
+        :return: Boolean
+        """
         try:
             self.input_df[col_name] = pd.to_datetime(self.input_df[col_name])
         except Exception:
-            return False
-        return True
+            return 0
+        return 1
 
     def find_largest_unused_catego_in_column(self, col):
+        """Checks which value in a column in in 'input_df' that does not appear in 'final_df' appears the must
+        amount of times.
+
+        :param col: (str) the name of the column
+        """
         unused_categos = set(self.input_df[col].unique()) - set(self.final_df[col].unique())
         category_potential = dict()
         for category in unused_categos:
@@ -418,10 +419,14 @@ class OneInputToFinalOptimization:
         return max(category_potential.items(), key=operator.itemgetter(1))[0]
 
     def determine_best_slicing_col_filter(self):
-        # two deciding factors: total number of rows that can be filtered (the larger the better),
-        # the number of elements to filter out (the larger the worse)
-        self.max_weighted_benefit = max([x['weighted_benefit'] for x in self.filtering_quick_gains])
-        max_eficiency_potential_info = [item for item in self.filtering_quick_gains if item['weighted_benefit'] == self.max_weighted_benefit][0]
+        """For the items in 'filtering_quick_gains' fin the one which yields the must benefit;
+        two deciding factors: total number of rows that can be filtered (the larger the better),
+        the number of elements to filter out (the larger the worse)
+
+        """
+        max_weighted_benefit = max([x['weighted_benefit'] for x in self.filtering_quick_gains])
+        max_eficiency_potential_info = [item for item in self.filtering_quick_gains
+                                        if item['weighted_benefit'] == max_weighted_benefit][0]
         if max_eficiency_potential_info['dtype'] != 'date':
             category_to_filter = self.find_largest_unused_catego_in_column(max_eficiency_potential_info['column'])
             logging.info("The suggested column to filter is {}, recommended value to filter: {}".format(

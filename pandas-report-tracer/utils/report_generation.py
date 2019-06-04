@@ -28,11 +28,15 @@ def print_report(obj, input_file, result_file, data_usage_plot):
     html_file.close()
 
 
-def generate_data_usage_plot(x):
-    # plotly horizontal bar chart for usage percentage:
+def generate_data_usage_plot(obj):
+    """Generates a plotly horizontal bar char on the axis 'x' and 'y'
+
+    :param obj: (object) of the class OneInputToFinalOptimization
+    :return: html plot
+    """
     usage_data = [go.Bar(
-        x=list(x.usage_percentage.values()),
-        y=list(x.usage_percentage.keys()),
+        x=list(obj.usage_percentage.values()),
+        y=list(obj.usage_percentage.keys()),
         orientation='h'
     )]
     return plot(usage_data, auto_open=False, output_type='div')
