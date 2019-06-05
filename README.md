@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.com/carlosjpc/Pandas-Report-Tracer.png?branch=master)](https://travis-ci.com/carlosjpc/Pandas-Report-Tracer)
+
 # Pandas-Report-Tracer
 find filters that could be applied to your inputs to speed up the report calculation, for reports built using pandas
 
