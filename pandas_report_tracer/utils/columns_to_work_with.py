@@ -91,6 +91,7 @@ class OneInputToFinalOptimization:
         self.combos_to_exclude = pd.DataFrame()
         self.extended_resulting_df = pd.DataFrame()
         self.filtering_quick_gains = list()
+        self.final_df = pd.DataFrame()
         self.input_df = input_df
         self.input_df_cols = input_df.columns
         self.matching_cols = list()
@@ -102,18 +103,18 @@ class OneInputToFinalOptimization:
 
     def find_matching_cols(self):
         """Compares the columns in 'input_df' and 'resulting_df' to find columns present in both DF, a second list is
-        colculated for columns also having id or Id in their name, to be used for merging the DFs if no mergin list is
-        provided.
+        calculated for columns also having id or Id in their name, to be used for merging the DFs if no 'merging_cols'
+        list is provided.
 
         """
-        # to identify a column for merge it must contain 'id' or 'Id'
         self.matching_cols = set(self.input_df.columns).intersection(self.resulting_df.columns)
         self.matching_id_cols = [col_name for col_name in self.matching_cols if 'id' in col_name or 'Id' in col_name]
         if self.matching_id_cols or self.merging_cols:
             try:
                 self.merge_input_to_final()
             except Exception as e:
-                logging.warning("The DFs have some 'id' columns to merge them but an exception araised when trying merge")
+                logging.warning("""The DFs have some 'id' columns to merge them but an exception
+                                   araises when trying merge""")
                 logging.warning(e)
                 pass
             else:
