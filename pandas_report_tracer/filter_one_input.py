@@ -33,7 +33,7 @@ if __name__ == "__main__":
         input_df = input_df.rename(columns=RENAMING_COLS_DICT[filenames[0]])
     results = dict()
     for run_number in range(MAX_NUMBER_OF_RUNS):
-        logging.info("-----------------"*5)
+        logging.info("-----------------" * 5)
         logging.info("Starting run: {}".format(str(run_number + 1)))
         if run_number == 0:
             input_df_row_num = len(input_df)

@@ -4,14 +4,15 @@ import jinja2
 from plotly.offline import plot
 import plotly.graph_objs as go
 
+TEMPLATE_FILE = "input_to_final.html"
+
 
 def print_report(obj, input_file, result_file, data_usage_plot):
     template_loader = jinja2.FileSystemLoader(searchpath="./report_templates/")
     template_env = jinja2.Environment(loader=template_loader)
-    TEMPLATE_FILE = "input_to_final.html"
     template = template_env.get_template(TEMPLATE_FILE)
-    
-    outputText = template.render(
+
+    output_text = template.render(
         best_filter=obj.best_filter,
         input_files=[input_file],
         merging_cols=obj.merging_cols,
@@ -24,7 +25,7 @@ def print_report(obj, input_file, result_file, data_usage_plot):
     )
     now = datetime.datetime.now()
     html_file = open('/tmp/report_results_{}.html'.format(now.strftime("%d%m%Y_%H-%M-%S")), 'w')
-    html_file.write(outputText)
+    html_file.write(output_text)
     html_file.close()
 
 

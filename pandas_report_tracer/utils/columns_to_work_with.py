@@ -355,8 +355,8 @@ class OneInputToFinalOptimization:
         input_catego_df = self.input_df.groupby(self.catego_cols)
         combos_to_exclude = list()
         for combo_row in self.combos_to_check_in_final:
-            if (self.isin_row(combo_row[0], final_catego_df) and
-                    self.combo_appears_often_in_input(combo_row[1], input_catego_df)):
+            if (self.isin_row(combo_row[0], final_catego_df) and self.combo_appears_often_in_input(
+                    combo_row[1], input_catego_df)):
                 combos_to_exclude.append(combo_row[0])
         self.combos_to_exclude = pd.concat(combos_to_exclude)
 
@@ -392,11 +392,11 @@ class OneInputToFinalOptimization:
         slicing_cols_unique_length = dict()
         for col in self.slicing_cols:
             slicing_cols_unique_length.update({col: len(self.input_df[col].unique())})
-        number_of_combinations = reduce(lambda x, y: x*y, slicing_cols_unique_length.values())
+        number_of_combinations = reduce(lambda x, y: x * y, slicing_cols_unique_length.values())
         while number_of_combinations > MULTIPLE_COMBINATION_FILTERS:
             max_key = max(slicing_cols_unique_length.items(), key=operator.itemgetter(1))[0]
             del slicing_cols_unique_length[max_key]
-            number_of_combinations = reduce(lambda x, y: x*y, slicing_cols_unique_length.values())
+            number_of_combinations = reduce(lambda x, y: x * y, slicing_cols_unique_length.values())
         self.catego_cols = list(slicing_cols_unique_length.keys())
 
     def convert_str_col_to_date(self, col_name):
