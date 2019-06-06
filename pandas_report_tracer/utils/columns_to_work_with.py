@@ -58,6 +58,7 @@ def analyze_one_input_to_result(one_input_to_final):
     if one_input_to_final.matching_cols.empty:
         logging.warning('Without shared columns this tool is worthless, consider renaming columns')
         return
+    one_input_to_final.merge_input_to_final()
     one_input_to_final.final_df_to_work_with()
     one_input_to_final.columns_usage_percentage()
     logging.info("Column usage percentage:")
@@ -107,38 +108,41 @@ class OneInputToFinalOptimization:
         list is provided.
 
         """
-        self.matching_cols = set(self.input_df.columns).intersection(self.resulting_df.columns)
+        self.matching_cols = list(set(self.input_df.columns).intersection(self.resulting_df.columns))
         self.matching_id_cols = [col_name for col_name in self.matching_cols if 'id' in col_name or 'Id' in col_name]
-        if self.matching_id_cols or self.merging_cols:
-            try:
-                self.merge_input_to_final()
-            except Exception as e:
-                logging.warning("""The DFs have some 'id' columns to merge them but an exception
-                                   araises when trying merge""")
-                logging.warning(e)
-                pass
-            else:
-                self.matching_cols = self.input_df.columns
-        else:
-            logging.warning('The input df could not be merged into final, that decreases the chances of success')
 
     def merge_input_to_final(self):
         """Merges the 'input_df' to 'final_df', if a list of columns was passed to the instance the merge is executed
         on those columns, otherwise on all 'matching_id_cols'
 
         """
-        if self.merging_cols:
-            input_df_cols = list((set(self.input_df.columns) - self.matching_cols))
-            self.extended_resulting_df = self.resulting_df.merge(
-                    self.input_df[input_df_cols + self.merging_cols],
-                    how='left', on=self.merging_cols
-                )
+        input_df_cols = list(set(self.input_df.columns) - set(self.matching_cols))
+        try:
+            if self.merging_cols:
+                self._merge_input_to_final_on_merging_cols(input_df_cols)
+            else:
+                self._merge_input_to_final_on_matching_id_cols(input_df_cols)
+        except Exception as e:
+            logging.warning("""The DFs have some 'id' columns to merge them but an exception
+                                   araises when trying merge""")
+            logging.warning(e)
+            pass
         else:
-            input_df_cols = list(set(self.input_df.columns) - (self.matching_cols - set(self.matching_id_cols)))
-            self.extended_resulting_df = self.resulting_df.merge(
-                    self.input_df[input_df_cols],
-                    how='left', on=self.matching_id_cols
-                )
+            self.matching_cols = self.input_df.columns
+
+    def _merge_input_to_final_on_merging_cols(self, input_df_cols):
+        input_df_cols.extend(self.merging_cols)
+        self.extended_resulting_df = self.resulting_df.merge(
+            self.input_df[input_df_cols],
+            how='left', on=self.merging_cols
+        )
+
+    def _merge_input_to_final_on_matching_id_cols(self, input_df_cols):
+        input_df_cols.extend(self.matching_id_cols)
+        self.extended_resulting_df = self.resulting_df.merge(
+            self.input_df[input_df_cols],
+            how='left', on=self.matching_id_cols
+        )
 
     def final_df_to_work_with(self):
         """Checks if the 'input_df' was merged to 'final_df', to work with that merged DF, which increases the scope
@@ -149,6 +153,7 @@ class OneInputToFinalOptimization:
             self.final_df = self.extended_resulting_df
         else:
             self.final_df = self.resulting_df
+            logging.warning('The input df could not be merged into final, that decreases the chances of success')
 
     def columns_usage_percentage(self):
         """Preliminary analysis that measure the ratio of unique values in 'input_df' that make it to the 'final_df',
