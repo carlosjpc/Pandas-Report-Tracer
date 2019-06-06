@@ -7,6 +7,15 @@ from pandas.util.testing import assert_frame_equal
 from pandas_report_tracer.utils.columns_to_work_with import OneInputToFinalOptimization
 
 
+def df_equal_without_column_order(df1, df2):
+    try:
+        assert_frame_equal(df1.sort_index(axis=1), df2.sort_index(axis=1), check_names=True)
+    except (AssertionError, ValueError, TypeError) as e:
+        raise e
+    else:
+        return 1
+
+
 class TestOneInputToFinalOptimization(unittest.TestCase):
 
     def test_find_matching_cols_no_ids(self):
@@ -47,4 +56,4 @@ class TestOneInputToFinalOptimization(unittest.TestCase):
             'column1': [1, np.nan],
             'column2': ['whateves', np.nan],
         })
-        assert_frame_equal(instance.extended_resulting_df, expected_df)
+        assert df_equal_without_column_order(instance.extended_resulting_df, expected_df)
