@@ -1,3 +1,4 @@
+codecov==2.0.15
 flake8==3.7.7
 jinja2==2.10.1
 pandas==0.24.2

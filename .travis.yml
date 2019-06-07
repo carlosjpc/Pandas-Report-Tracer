@@ -12,4 +12,4 @@ script:
   - flake8 pandas_report_tracer
   - pytest --cov=./
 after_success:
-  - codecov
+  - codecov -t e59ef5c2-ed75-484b-9f9a-6b3c773c668b
