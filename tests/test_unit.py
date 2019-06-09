@@ -32,11 +32,6 @@ class TestOneInputToFinalOptimization(unittest.TestCase):
         'id1': ['key1.1', 'key1.2', 'key1.3', 'key1.4'],
         'id2': ['key2.1', 'key2.2', 'key2.3', 'key2.5']
     })
-    # check tests Readme.md
-    ams_input_fixture = pd.read_csv(
-        '{}/fixtures/input/AMSBillofLandingHeaders-2018-sample.csv.gz'.format(HERE), compression='gzip')
-    ams_result_fixture = pd.read_csv(
-        '{}/fixtures/result/filtered_AMSBillofLandingHeaders-2018-sample.csv.gz'.format(HERE), compression='gzip')
 
     def test_find_matching_cols_no_ids(self):
         input_df = pd.DataFrame(columns=['column1', 'column2', 'column3'])
@@ -80,8 +75,6 @@ class TestOneInputToFinalOptimization(unittest.TestCase):
         })
         assert df_equal_without_column_order(instance2.extended_resulting_df, expected_df)
 
-    # TODO test final_df_to_work_with
-
     def test_columns_usage_percentage(self):
         instance = OneInputToFinalOptimization(self.input_df, self.resulting_df, merging_cols=['id2'])
         instance.find_matching_cols()
@@ -90,11 +83,6 @@ class TestOneInputToFinalOptimization(unittest.TestCase):
         instance.columns_usage_percentage()
         assert {'column1': 0.80, 'column2': 0.80, 'id1': 0.75, 'id2': 0.80} == instance.usage_percentage
         assert 0.7875000000000001 == instance.overall_percentage
-
-    # TODO needs better input_df and resulting_df
-    def test_set_slicing_cols(self):
-        instance = OneInputToFinalOptimization(self.input_df, self.resulting_df)
-        instance.set_slicing_cols()
 
     def test_is_in_row(self):
         rows = pd.DataFrame({
@@ -107,3 +95,41 @@ class TestOneInputToFinalOptimization(unittest.TestCase):
         row_2 = rows.iloc[[1]]
         assert OneInputToFinalOptimization.isin_row(row_1, self.input_df)
         assert not OneInputToFinalOptimization.isin_row(row_2, self.input_df)
+
+
+class TestOneInputToFinalOptimizationAMS(unittest.TestCase):
+    # check tests Readme.md
+    ams_input_fixture = pd.read_csv(
+        '{}/fixtures/input/AMSBillofLandingHeaders-2018-sample.csv.gz'.format(HERE), compression='gzip')
+    ams_result_fixture = pd.read_csv(
+        '{}/fixtures/result/filtered_AMSBillofLandingHeaders-2018-sample.csv.gz'.format(HERE), compression='gzip')
+    ams_based_obj = OneInputToFinalOptimization(ams_input_fixture, ams_result_fixture, merging_cols=['Index'])
+    ams_based_obj.find_matching_cols()
+    ams_based_obj.merge_input_to_final()
+    ams_based_obj.final_df_to_work_with()
+
+    def test_ams_find_matching_cols(self):
+        assert set(self.ams_based_obj.matching_cols) == {
+            'index', 'actual_arrival_date', 'port_of_unlading', 'vessel_name', 'weight', 'estimated_arrival_date',
+            'foreign_port_of_lading_qualifier', 'manifest_unit', 'foreign_port_of_lading'
+        }
+
+    def test_ams_final_df_to_work_with(self):
+        assert set(self.ams_based_obj.final_df.columns) == {
+            'actual_arrival_date', 'estimated_arrival_date', 'foreign_port_of_lading',
+            'foreign_port_of_lading_qualifier', 'index', 'manifest_unit', 'port_of_unlading', 'vessel_name', 'weight'
+        }
+
+    def test_ams_columns_usage_percentage(self):
+        self.ams_based_obj.columns_usage_percentage()
+        assert self.ams_based_obj.usage_percentage == {
+            'actual_arrival_date': 0.13725490196078433,
+            'estimated_arrival_date': 0,
+            'foreign_port_of_lading': 0.4827586206896552,
+            'foreign_port_of_lading_qualifier': 1.0,
+            'index': 0.0012,
+            'manifest_unit': 0.6419753086419753,
+            'port_of_unlading': 0.2736842105263158,
+            'vessel_name': 0.31327433628318585,
+            'weight': 0.20916052183777653
+        }
