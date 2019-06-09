@@ -55,7 +55,7 @@ def analyze_one_input_to_result(one_input_to_final):
     """
     logging.info("Starting Analisis")
     one_input_to_final.find_matching_cols()
-    if one_input_to_final.matching_cols.empty:
+    if not one_input_to_final.matching_cols:
         logging.warning('Without shared columns this tool is worthless, consider renaming columns')
         return
     one_input_to_final.merge_input_to_final()
@@ -71,9 +71,9 @@ def analyze_one_input_to_result(one_input_to_final):
             one_input_to_final.determine_date_range_filters(slicing_col)
         else:
             one_input_to_final.determine_category_col_filters(slicing_col)
+    one_input_to_final.determine_best_slicing_col_filter()
     one_input_to_final.determine_possible_multi_column_filters()
     one_input_to_final.determine_multi_column_filters()
-    one_input_to_final.determine_best_slicing_col_filter()
 
 
 class OneInputToFinalOptimization:
@@ -249,10 +249,9 @@ class OneInputToFinalOptimization:
                 lesser_date_input = non_na_inputdf.loc[non_na_inputdf[col] < date_]
                 if len(lesser_date_input) > weighted_benefit:
                     logging.info('Found query optimizing chance in col: {}, filter: {}'.format(col, period))
-                    weighted_benefit = len(lesser_date_input)
+                    weighted_benefit = useless_rows = len(lesser_date_input)
                     the_column = col
                     filter_out = (period, date_)
-                    useless_rows = len(lesser_date_input)
         if weighted_benefit > 0:
             self.filtering_quick_gains.append({
                 'column': the_column,
@@ -339,8 +338,6 @@ class OneInputToFinalOptimization:
             self.catego_cols = self.slicing_cols
         else:
             self.set_catego_columns()
-        logging.info("Category Columns:")
-        logging.info(self.catego_cols)
         for col in self.catego_cols:
             unique_values = list(self.input_df[col].unique())
             lists_for_prod.append(unique_values)
@@ -359,15 +356,6 @@ class OneInputToFinalOptimization:
                     combo_row[1], input_catego_df)):
                 combos_to_exclude.append(combo_row[0])
         self.combos_to_exclude = pd.concat(combos_to_exclude)
-
-        logging.info("""
-        Of the {} value combinations across columns: {}; {} don't show in the final DF, consider filtering those out.
-        """.format(
-            len(self.combos_to_check_in_final),
-            self.combos_to_exclude.columns,
-            len(self.combos_to_exclude)
-        ))
-        logging.info(self.combos_to_exclude)
 
     def use_all_slicing_cols_as_catego_cols(self):
         """Checks that the number of combinations to try as multiple column filter is less than:
@@ -455,4 +443,3 @@ class OneInputToFinalOptimization:
                 max_eficiency_potential_info['weighted_benefit'],
                 len(self.input_df) / max_eficiency_potential_info['weighted_benefit']
             )
-        logging.info("Full efficiency analisis: {}".format(self.filtering_quick_gains))
