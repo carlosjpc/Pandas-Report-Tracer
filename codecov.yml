@@ -13,7 +13,7 @@ coverage:
     changes: no
 
   ignore:
-    - "test/.*"
+    - "tests/.*"
 
 comment:
   layout: "header, diff, changes, sunburst, uncovered, tree"

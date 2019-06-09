@@ -1,6 +1,6 @@
+# Pandas-Report-Tracer
 [![Build Status](https://travis-ci.com/carlosjpc/Pandas-Report-Tracer.png?branch=master)](https://travis-ci.com/carlosjpc/Pandas-Report-Tracer) [![codecov](https://codecov.io/gh/carlosjpc/Pandas-Report-Tracer/branch/master/graph/badge.svg)](https://codecov.io/gh/carlosjpc/Pandas-Report-Tracer)
 
-# Pandas-Report-Tracer
 find filters that could be applied to your inputs to speed up the report calculation, for reports built using pandas
 
 When creating a report we usually start with whole tables and start applying the business logic. After some back and forth with the data sources and the report stockholders we tend to wrap up our work by filtering the final columns, giving them more user friendly names and probably sorting the dataframe.

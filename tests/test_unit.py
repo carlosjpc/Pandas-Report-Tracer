@@ -1,10 +1,13 @@
 import numpy as np
 import pandas as pd
+import os
 import unittest
 
 from pandas.util.testing import assert_frame_equal
 
 from pandas_report_tracer.utils.columns_to_work_with import OneInputToFinalOptimization
+
+HERE = os.path.dirname(os.path.abspath(__file__))
 
 
 def df_equal_without_column_order(df1, df2):
@@ -29,6 +32,11 @@ class TestOneInputToFinalOptimization(unittest.TestCase):
         'id1': ['key1.1', 'key1.2', 'key1.3', 'key1.4'],
         'id2': ['key2.1', 'key2.2', 'key2.3', 'key2.5']
     })
+    # check tests Readme.md
+    ams_input_fixture = pd.read_csv(
+        '{}/fixtures/input/AMSBillofLandingHeaders-2018-sample.csv.gz'.format(HERE), compression='gzip')
+    ams_result_fixture = pd.read_csv(
+        '{}/fixtures/result/filtered_AMSBillofLandingHeaders-2018-sample.csv.gz'.format(HERE), compression='gzip')
 
     def test_find_matching_cols_no_ids(self):
         input_df = pd.DataFrame(columns=['column1', 'column2', 'column3'])
