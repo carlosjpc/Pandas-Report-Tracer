@@ -4,7 +4,10 @@ import pickle as pkl
 import os
 import unittest
 
-from pandas_report_tracer.utils.columns_to_work_with import OneInputToFinalOptimization, analyze_one_input_to_result
+from pandas_report_tracer.utils.columns_to_work_with import (OneInputToFinalOptimization, analyze_one_input_to_result,
+                                                             filter_and_save_inputfile)
+
+from tests.test_unit import df_equal_without_column_order
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -126,3 +129,22 @@ class TestOneInputToFinalOptimizationAMS(unittest.TestCase):
         assert self.ams_based_obj.best_filter == (
             'estimated_arrival_date', ('one_year_period', datetime.date(2018, 4, 1)), 'date', 41373, 2.4170352645445097
         )
+
+    def test_filter_and_save_inputfile(self):
+        filter_and_save_inputfile(self.ams_based_obj, '/tmp/filtered_input.csv')
+        filtered_input = pd.read_csv('/tmp/filtered_input.csv', encoding='utf-8', escapechar='\\')
+        expected_filtered_input = pd.read_csv("{}/fixtures/test_results/expected_filtered_input.csv".format(HERE))
+        assert df_equal_without_column_order(filtered_input, expected_filtered_input)
+
+    def test_use_all_slicing_cols_as_catego_cols(self):
+        instance = OneInputToFinalOptimization(self.ams_input_fixture, self.ams_result_fixture)
+        instance.slicing_cols = instance.input_df_cols
+        assert not instance.use_all_slicing_cols_as_catego_cols()
+
+    def test_set_catego_columns(self):
+        self.ams_based_obj.set_catego_columns()
+        assert self.ams_based_obj.catego_cols == [
+            'foreign_port_of_lading_qualifier', 'weight_unit', 'record_status_indicator',
+            'foreign_port_of_destination_qualifier', 'conveyance_id_qualifier', 'in_bond_entry_type',
+            'mode_of_transportation', 'secondary_notify_party_8'
+        ]

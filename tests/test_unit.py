@@ -95,3 +95,8 @@ class TestOneInputToFinalOptimization(unittest.TestCase):
         row_2 = rows.iloc[[1]]
         assert OneInputToFinalOptimization.isin_row(row_1, self.input_df)
         assert not OneInputToFinalOptimization.isin_row(row_2, self.input_df)
+
+    def test_use_all_slicing_cols_as_catego_cols(self):
+        instance = OneInputToFinalOptimization(self.input_df, self.resulting_df)
+        instance.slicing_cols = instance.input_df_cols
+        assert instance.use_all_slicing_cols_as_catego_cols()
