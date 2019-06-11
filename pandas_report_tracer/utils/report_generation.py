@@ -20,7 +20,7 @@ def print_report(obj, input_file, result_file, data_usage_plot):
         overall_percentage=obj.overall_percentage,
         data_usage_plot=data_usage_plot,
         filtering_quick_gains=obj.filtering_quick_gains,
-        multi_columns_filter_df=obj.combos_to_exclude,
+        multi_columns_filter_df=obj.combos_to_exclude.to_html(),
         result_file=result_file
     )
     now = datetime.datetime.now()

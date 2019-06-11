@@ -5,8 +5,8 @@ import glob
 
 import pandas as pd
 
-from pandas_report_tracer.utils.columns_to_work_with import OneInputToFinalOptimization, analyze_one_input_to_result
-from pandas_report_tracer.utils.report_generation import generate_data_usage_plot, print_report
+from utils.columns_to_work_with import OneInputToFinalOptimization, analyze_one_input_to_result
+from utils.report_generation import generate_data_usage_plot, print_report
 
 INPUT_PATH = "/tmp/input"
 RESULT_PATH = "/tmp/result"

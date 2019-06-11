@@ -1,4 +1,5 @@
 import datetime
+import codecs
 import pandas as pd
 import pickle as pkl
 import os
@@ -6,6 +7,7 @@ import unittest
 
 from pandas_report_tracer.utils.columns_to_work_with import (OneInputToFinalOptimization, analyze_one_input_to_result,
                                                              filter_and_save_inputfile)
+from pandas_report_tracer.utils.report_generation import generate_data_usage_plot
 
 from tests.test_unit import df_equal_without_column_order
 
@@ -127,7 +129,7 @@ class TestOneInputToFinalOptimizationAMS(unittest.TestCase):
 
     def test_determine_best_slicing_col_filter(self):
         assert self.ams_based_obj.best_filter == (
-            'estimated_arrival_date', ('one_year_period', datetime.date(2018, 4, 1)), 'date', 41373, 2.4170352645445097
+            'estimated_arrival_date', ('one_year_period', datetime.date(2018, 4, 1)), 'date', 41373, 0.41373
         )
 
     def test_filter_and_save_inputfile(self):

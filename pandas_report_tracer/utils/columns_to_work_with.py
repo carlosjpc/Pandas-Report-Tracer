@@ -418,9 +418,9 @@ class OneInputToFinalOptimization:
         the number of elements to filter out (the larger the worse)
 
         """
-        max_weighted_benefit = max([x['weighted_benefit'] for x in self.filtering_quick_gains])
+        self.max_weighted_benefit = max([x['weighted_benefit'] for x in self.filtering_quick_gains])
         max_eficiency_potential_info = [item for item in self.filtering_quick_gains
-                                        if item['weighted_benefit'] == max_weighted_benefit][0]
+                                        if item['weighted_benefit'] == self.max_weighted_benefit][0]
         if max_eficiency_potential_info['dtype'] != 'date':
             category_to_filter = self.find_largest_unused_catego_in_column(max_eficiency_potential_info['column'])
             logging.info("The suggested column to filter is {}, recommended value to filter: {}".format(
@@ -441,5 +441,5 @@ class OneInputToFinalOptimization:
                 max_eficiency_potential_info['filter_out'],
                 max_eficiency_potential_info['dtype'],
                 max_eficiency_potential_info['weighted_benefit'],
-                len(self.input_df) / max_eficiency_potential_info['weighted_benefit']
+                max_eficiency_potential_info['weighted_benefit'] / len(self.input_df)
             )
