@@ -406,6 +406,8 @@ class OneInputToFinalOptimization:
         :param col: (str) the name of the column
         """
         unused_categos = set(self.input_df[col].unique()) - set(self.final_df[col].unique())
+        if not unused_categos:
+            raise ValueError("This column has no unused categories")
         category_potential = dict()
         for category in unused_categos:
             unused_rows_for_category = len(self.input_df.loc[self.input_df[col] == category])

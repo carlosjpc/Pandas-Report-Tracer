@@ -132,6 +132,10 @@ class TestOneInputToFinalOptimizationAMS(unittest.TestCase):
             'estimated_arrival_date', ('one_year_period', datetime.date(2018, 4, 1)), 'date', 41373, 0.41373
         )
 
+    def test_find_largest_unused_catego_in_column(self):
+        x = self.ams_based_obj.find_largest_unused_catego_in_column('foreign_port_of_destination_qualifier')
+        assert x == 'Schedule K Foreign Port'
+
     def test_filter_and_save_inputfile(self):
         filter_and_save_inputfile(self.ams_based_obj, '/tmp/filtered_input.csv')
         filtered_input = pd.read_csv('/tmp/filtered_input.csv', encoding='utf-8', escapechar='\\')
@@ -150,3 +154,7 @@ class TestOneInputToFinalOptimizationAMS(unittest.TestCase):
             'foreign_port_of_destination_qualifier', 'conveyance_id_qualifier', 'in_bond_entry_type',
             'mode_of_transportation', 'secondary_notify_party_8'
         ]
+
+    def test_multi_column_logic(self):
+        self.ams_based_obj.determine_possible_multi_column_filters()
+        # self.ams_based_obj.determine_multi_column_filters()
