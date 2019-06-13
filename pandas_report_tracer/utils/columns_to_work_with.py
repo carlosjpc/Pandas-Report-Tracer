@@ -20,6 +20,36 @@ logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 
+def analyze_one_input_to_result(one_input_to_final):
+    """Runs functions of the class OneInputToFinalOptimization on an object of the class to get the best single
+    column filter while also generating the data for the 'print_report' and 'generate_data_usage_plot'.
+
+    Parameters:
+    one_input_to_final (object): an object of the class OneInputToFinalOptimization
+    Returns:
+    None
+    """
+    logging.info("Starting Analisis")
+    one_input_to_final.find_matching_cols()
+    if not one_input_to_final.matching_cols:
+        logging.warning('Without shared columns this tool is worthless, consider renaming columns')
+        return
+    one_input_to_final.merge_input_to_final()
+    one_input_to_final.set_final_df_to_work_with()
+    one_input_to_final.columns_usage_percentage()
+    logging.info("Column usage percentage:")
+    logging.info(one_input_to_final.usage_percentage)
+    one_input_to_final.get_dtypes_for_natural_divider_cols()
+    for slicing_col, dtype in one_input_to_final.natural_dividers_dtypes.items():
+        if 'date' in dtype:
+            one_input_to_final.determine_date_range_filters(slicing_col)
+        else:
+            one_input_to_final.determine_category_col_filters(slicing_col)
+    one_input_to_final.determine_best_slicing_col_filter()
+    one_input_to_final.determine_possible_multi_column_filters()
+    one_input_to_final.determine_multi_column_filters()
+
+
 def filter_and_save_inputfile(result_ob, input_file_name):
     """Applies the best filter, result of running 'analyze_one_input_to_result' to the input_df and saves it,
     replacing the original file.
@@ -44,36 +74,49 @@ def filter_and_save_inputfile(result_ob, input_file_name):
     result_ob.input_df.to_csv(input_file_name, index=False, encoding='utf-8', escapechar='\\')
 
 
-def analyze_one_input_to_result(one_input_to_final):
-    """Runs functions of the class OneInputToFinalOptimization on an object of the class to get the best single
-    column filter while also generating the data for the 'print_report' and 'generate_data_usage_plot'.
+def isin_row(row, df):
+    """Given a 'row' (specific combination of values for the DF columns) this function searches the 'df'
+    for that same combination of values, return True if the 'df' has that exact combination, False if otherwise.
 
-    Parameters:
-    one_input_to_final (object): an object of the class OneInputToFinalOptimization
-    Returns:
-    None
+    :param row: (DataFrame) single row df
+    :param df: (DataFrame) df where the row is searched
+    :return: Boolean
     """
-    logging.info("Starting Analisis")
-    one_input_to_final.find_matching_cols()
-    if not one_input_to_final.matching_cols:
-        logging.warning('Without shared columns this tool is worthless, consider renaming columns')
-        return
-    one_input_to_final.merge_input_to_final()
-    one_input_to_final.final_df_to_work_with()
-    one_input_to_final.columns_usage_percentage()
-    logging.info("Column usage percentage:")
-    logging.info(one_input_to_final.usage_percentage)
-    one_input_to_final.set_slicing_cols()
-    logging.info("Slicing cols:")
-    logging.info(one_input_to_final.slicing_cols)
-    for slicing_col, dtype in one_input_to_final.slicing_cols.items():
-        if 'date' in dtype:
-            one_input_to_final.determine_date_range_filters(slicing_col)
-        else:
-            one_input_to_final.determine_category_col_filters(slicing_col)
-    one_input_to_final.determine_best_slicing_col_filter()
-    one_input_to_final.determine_possible_multi_column_filters()
-    one_input_to_final.determine_multi_column_filters()
+    cols = df.columns
+    bool_series = functools.reduce(lambda x, y: x & y, [df[col].isin(row[col]) for col in cols])
+    return bool_series.any()
+
+
+def is_natural_divider(df_series):
+    """Determines if a column of the 'input_df' would serve as a good filter, if the ratio of unique values to
+    the number of rows is high the column is consider a 'natural divider' date columns are always natural dividers,
+    but this function they may not show as, be cautious.
+
+    :param df_series: (pandas series) series to be checked to see if it is a 'natural divider'
+    :return: Boolean
+    """
+    # if a string or int column can be used as divider
+    unique_rows = len(df_series.unique())
+    total_rows = len(df_series)
+    ratio = total_rows / unique_rows
+    logging.info('Column: {} has {} unique rows in {} rows, a {} to 1 relationship'.format(
+        df_series._name, str(unique_rows), str(total_rows), str(ratio)))
+    if ratio > NATURAL_DIVIDER_THRESOLD:
+        return 1
+
+
+def convert_str_col_to_date(df, col_name):
+    """Tries to convert a column to dtype datetime64.
+
+    :param df: (DataFrame)
+    :param col_name: (str) the name of the column
+    :return: Boolean
+    """
+    try:
+        df[col_name] = pd.to_datetime(df[col_name])
+    except Exception:
+        return 0
+    return 1
 
 
 class OneInputToFinalOptimization:
@@ -87,19 +130,15 @@ class OneInputToFinalOptimization:
     }
 
     def __init__(self, input_df, resulting_df, merging_cols=None):
-        self.catego_cols = list()
-        self.combos_to_check_in_final = list()
-        self.combos_to_exclude = pd.DataFrame()
         self.extended_resulting_df = pd.DataFrame()
         self.filtering_quick_gains = list()
         self.final_df = pd.DataFrame()
         self.input_df = input_df
-        self.input_df_cols = input_df.columns
         self.matching_cols = list()
         self.matching_id_cols = list()
         self.merging_cols = merging_cols
+        self.natural_dividers_dtypes = dict()
         self.resulting_df = resulting_df
-        self.slicing_cols = dict()
         self.usage_percentage = dict()
 
     def find_matching_cols(self):
@@ -144,7 +183,7 @@ class OneInputToFinalOptimization:
             how='left', on=self.matching_id_cols
         )
 
-    def final_df_to_work_with(self):
+    def set_final_df_to_work_with(self):
         """Checks if the 'input_df' was merged to 'final_df', to work with that merged DF, which increases the scope
         of the analysis because all columns are considered, otherwise only the 'matching cols'.
 
@@ -175,40 +214,23 @@ class OneInputToFinalOptimization:
             self.usage_percentage.update({col: percentage})
         self.overall_percentage = statistics.mean(self.usage_percentage.values())
 
-    def set_slicing_cols(self):
+    def get_dtypes_for_natural_divider_cols(self):
         """For each column in 'input_df' determine its dtype (many columns have dtype object which is not useful
         for this analysis). And add to a dictionary if 'is_natural_divider'
 
         """
         for col in self.input_df.columns:
             if 'date' in col or 'Date' in col:
-                if self.convert_str_col_to_date(col):
-                    self.slicing_cols.update({col: 'date'})
+                if convert_str_col_to_date(self.input_df, col):
+                    self.natural_dividers_dtypes.update({col: 'date'})
             elif is_string_dtype(self.input_df[col]):
-                if self.is_natural_divider(self.input_df[col]):
-                    self.slicing_cols.update({col: 'string'})
+                if is_natural_divider(self.input_df[col]):
+                    self.natural_dividers_dtypes.update({col: 'string'})
             elif is_integer_dtype(self.input_df[col]):
-                if self.is_natural_divider(self.input_df[col]):
-                    self.slicing_cols.update({col: 'integer'})
+                if is_natural_divider(self.input_df[col]):
+                    self.natural_dividers_dtypes.update({col: 'integer'})
             elif is_bool_dtype(self.input_df[col]):
-                self.slicing_cols.update({col: 'boolean'})
-
-    @staticmethod
-    def is_natural_divider(df_series):
-        """Determines if a column of the 'input_df' would serve as a good filter, if the ratio of unique values to
-        the number of rows is high the column is consider a 'natural divider'
-
-        :param df_series: (pandas series) series to be checked to see if it is a 'natural divider'
-        :return: Boolean
-        """
-        # if a string or int column can be used as divider
-        unique_rows = len(df_series.unique())
-        total_rows = len(df_series)
-        ratio = total_rows / unique_rows
-        logging.info('Column: {} has {} unique rows in {} rows, a {} to 1 relationship'.format(
-            df_series._name, str(unique_rows), str(total_rows), str(ratio)))
-        if ratio > NATURAL_DIVIDER_THRESOLD:
-            return 1
+                self.natural_dividers_dtypes.update({col: 'boolean'})
 
     def handle_na_in_date_cols(self, col):
         """This function checks for nans values in the 'input_df' DF for a given column, if there are such values
@@ -232,15 +254,15 @@ class OneInputToFinalOptimization:
         """For each of the time ranges determined in the 'date_slices' class dictionary this functions checks if
         there is data in the 'final_df' if not it continues with the next date range, otherwise it checks if there is
         data for that same date range in the 'input_df', if so, there is un needed rows in the 'input_df' that should
-        be filtered. That information is stored in function variables to determine the best date range filter that can
-        be applied to that column, that information is stored in a dictionary and appended to 'filtering_quick_gains'
-        an instance list.
+        be filtered. That information is stored in function variables to later, determine the best date range filter
+        that can be applied to that column, that information is stored in a dictionary and appended to
+        'filtering_quick_gains' an instance list.
 
         :param col: (str) the name of the column in the 'input_df'
         """
         self.handle_na_in_date_cols(col)
         non_na_inputdf = self.input_df.dropna(subset=[col])
-        self.final_df[col] = pd.to_datetime(self.final_df[col])
+        self.final_df[col] = convert_str_col_to_date(self.final_df, col)
         non_na_finaldf = self.final_df.dropna(subset=[col])
         weighted_benefit = 0
         for period, date_ in self.date_slices.items():
@@ -275,7 +297,7 @@ class OneInputToFinalOptimization:
         expected_unused_rows_per_catego = unused_inputdf_rows / len(unused_categos)
         self.filtering_quick_gains.append({
             'column': col,
-            'dtype': self.slicing_cols[col],
+            'dtype': self.natural_dividers_dtypes[col],
             'filter_out': unused_categos,
             'useless_rows': unused_inputdf_rows,
             'weighted_benefit': expected_unused_rows_per_catego
@@ -288,116 +310,6 @@ class OneInputToFinalOptimization:
             logging.info(
                 "Found query optimizing chance in col: {}, reading ({}) unused rows, consider filtering out: {}".format(
                     col, unused_inputdf_rows, unused_categos))
-
-    @staticmethod
-    def isin_row(row, df):
-        """Given a 'row' (specific combination of values for the DF columns) this function searches the 'df'
-        for that same combination of values, return True if the 'df' has that exact combination, False if otherwise.
-
-        :param row: (DataFrame) single row df
-        :param df: (DataFrame) df where the row is searched
-        :return: Boolean
-        """
-        cols = df.columns
-        bool_series = functools.reduce(lambda x, y: x & y, [df[col].isin(row[col]) for col in cols])
-        return bool_series.any()
-
-    def combo_appears_often_in_input(self, row, input_catego_df):
-        """Given a combination of values for the columns in 'catego_cols' this function weights the amount
-        of appearences in relation to the 'input_df' to determine if a filter excluding this combination is valuable.
-
-        :param row: (DataFrame) single row df
-        :param input_catego_df: (DataFrame): a DataFrame grouped by columns in 'catego_cols'
-        :return: Boolean
-        """
-        df = input_catego_df.get_group(row)
-        multi_col_filter_ratio = len(df) / len(self.input_df)
-        if multi_col_filter_ratio > MULTI_COL_FILTER_RATIO:
-            return 1
-        else:
-            return 0
-
-    def determine_possible_multi_column_filters(self):
-        """For the values / columns combinations generated using 'generate_possible_combinations', check if the
-        combination exists in the 'input_df'.
-
-        """
-        combinations_generator = self.generate_possible_combinations()
-        input_catego_df = self.input_df[self.catego_cols].drop_duplicates()
-        for combo in combinations_generator:
-            combo_row_df = pd.DataFrame([combo], columns=input_catego_df.columns)
-            if self.isin_row(combo_row_df, input_catego_df):
-                self.combos_to_check_in_final.append((combo_row_df, combo))
-
-    def generate_possible_combinations(self):
-        """For the columns in the 'catego_cols' list calculate all possible combinations of the columns unique values
-
-        """
-        lists_for_prod = list()
-        if self.use_all_slicing_cols_as_catego_cols():
-            self.catego_cols = self.slicing_cols
-        else:
-            self.set_catego_columns()
-        for col in self.catego_cols:
-            unique_values = list(self.input_df[col].unique())
-            lists_for_prod.append(unique_values)
-        return itertools.product(*lists_for_prod)
-
-    def determine_multi_column_filters(self):
-        """For the values / columns combinations already generated and found in 'input_df' check that is exists in
-        the 'final_df' and that it appears often, if so it is added to a DF for post in the report.
-
-        """
-        final_catego_df = self.final_df[self.catego_cols].drop_duplicates()
-        input_catego_df = self.input_df.groupby(self.catego_cols)
-        combos_to_exclude = list()
-        for combo_row in self.combos_to_check_in_final:
-            if (self.isin_row(combo_row[0], final_catego_df) and self.combo_appears_often_in_input(
-                    combo_row[1], input_catego_df)):
-                combos_to_exclude.append(combo_row[0])
-        self.combos_to_exclude = pd.concat(combos_to_exclude)
-
-    def use_all_slicing_cols_as_catego_cols(self):
-        """Checks that the number of combinations to try as multiple column filter is less than:
-        'MULTIPLE_COMBINATION_FILTERS' if all columns in 'slicing_cols' are considered. Because combinations
-        grow quiet fast we need to be more careful.
-
-        :return: Boolean
-        """
-        number_of_combinations = 1
-        for col in self.slicing_cols:
-            number_of_combinations *= len(self.input_df[col].unique())
-            if number_of_combinations > MULTIPLE_COMBINATION_FILTERS:
-                return 0
-        return 1
-
-    def set_catego_columns(self):
-        """If the number of combinations is larger than 'MULTIPLE_COMBINATION_FILTERS' in take out the column with the
-        must unique values and calculate the number of combinations again, until the number is bellow the threshold.
-
-        :return:
-        """
-        slicing_cols_unique_length = dict()
-        for col in self.slicing_cols:
-            slicing_cols_unique_length.update({col: len(self.input_df[col].unique())})
-        number_of_combinations = reduce(lambda x, y: x * y, slicing_cols_unique_length.values())
-        while number_of_combinations > MULTIPLE_COMBINATION_FILTERS:
-            max_key = max(slicing_cols_unique_length.items(), key=operator.itemgetter(1))[0]
-            del slicing_cols_unique_length[max_key]
-            number_of_combinations = reduce(lambda x, y: x * y, slicing_cols_unique_length.values())
-        self.catego_cols = list(slicing_cols_unique_length.keys())
-
-    def convert_str_col_to_date(self, col_name):
-        """Tries to convert a column to dtype datetime64.
-
-        :param col_name: (str) the name of the column
-        :return: Boolean
-        """
-        try:
-            self.input_df[col_name] = pd.to_datetime(self.input_df[col_name])
-        except Exception:
-            return 0
-        return 1
 
     def find_largest_unused_catego_in_column(self, col):
         """Checks which value in a column in in 'input_df' that does not appear in 'final_df' appears the must
@@ -445,3 +357,81 @@ class OneInputToFinalOptimization:
                 max_eficiency_potential_info['weighted_benefit'],
                 max_eficiency_potential_info['weighted_benefit'] / len(self.input_df)
             )
+
+
+class MultiColumnFilters:
+
+    def __init__(self, input_df, resulting_df):
+        self.combo_cols = dict()
+        self.combos_to_check_in_final = list()
+        self.combos_to_exclude = pd.DataFrame()
+        self.input_df = input_df
+        self.resulting_df = resulting_df
+
+    def combo_appears_often_in_input(self, row, input_catego_df):
+        """Given a combination of values for the columns in 'combo_cols' this function weights the amount
+        of appearences in relation to the 'input_df' to determine if a filter excluding this combination is valuable.
+
+        :param row: (DataFrame) single row df
+        :param input_catego_df: (DataFrame): a DataFrame grouped by columns in 'combo_cols'
+        :return: Boolean
+        """
+        df = input_catego_df.get_group(row)
+        multi_col_filter_ratio = len(df) / len(self.input_df)
+        if multi_col_filter_ratio > MULTI_COL_FILTER_RATIO:
+            return 1
+        else:
+            return 0
+
+    def determine_possible_multi_column_filters(self):
+        """For the values / columns combinations generated using 'generate_possible_combinations', check if the
+        combination exists in the 'input_df'.
+
+        """
+        combinations_generator = self.generate_possible_combinations()
+        input_catego_df = self.input_df[self.combo_cols].drop_duplicates()
+        for combo in combinations_generator:
+            combo_row_df = pd.DataFrame([combo], columns=input_catego_df.columns)
+            if isin_row(combo_row_df, input_catego_df):
+                self.combos_to_check_in_final.append((combo_row_df, combo))
+
+    def generate_possible_combinations(self):
+        """For the columns in the 'combo_cols' list calculate all possible combinations of the columns unique values
+
+        """
+        lists_for_prod = list()
+        self.set_catego_columns()
+        for col in self.combo_cols:
+            unique_values = list(self.input_df[col].unique())
+            lists_for_prod.append(unique_values)
+        return itertools.product(*lists_for_prod)
+
+    def determine_multi_column_filters(self):
+        """For the values / columns combinations already generated and found in 'input_df' check that is exists in
+        the 'final_df' and that it appears often, if so it is added to a DF for post in the report.
+
+        """
+        final_catego_df = self.final_df[self.combo_cols].drop_duplicates()
+        input_catego_df = self.input_df.groupby(self.combo_cols)
+        combos_to_exclude = list()
+        for combo_row in self.combos_to_check_in_final:
+            if (isin_row(combo_row[0], final_catego_df) and self.combo_appears_often_in_input(
+                    combo_row[1], input_catego_df)):
+                combos_to_exclude.append(combo_row[0])
+        self.combos_to_exclude = pd.concat(combos_to_exclude)
+
+    def set_catego_columns(self):
+        """If the number of combinations is larger than 'MULTIPLE_COMBINATION_FILTERS' in take out the column with the
+        must unique values and calculate the number of combinations again, until the number is bellow the threshold.
+
+        :return:
+        """
+        for col in self.input_df.columns:
+            if is_natural_divider(self.input_df[col]):
+                self.combo_cols.update({col: len(self.input_df[col].unique())})
+        number_of_combinations = reduce(lambda x, y: x * y, self.combo_cols.values())
+        while number_of_combinations > MULTIPLE_COMBINATION_FILTERS:
+            max_key = max(self.combo_cols.items(), key=operator.itemgetter(1))[0]
+            del self.combo_cols[max_key]
+            number_of_combinations = reduce(lambda x, y: x * y, self.combo_cols.values())
+        self.combo_cols = list(self.combo_cols.keys())
