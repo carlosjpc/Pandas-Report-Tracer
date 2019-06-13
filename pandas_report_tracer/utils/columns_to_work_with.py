@@ -105,20 +105,6 @@ def is_natural_divider(df_series):
         return 1
 
 
-def convert_str_col_to_date(df, col_name):
-    """Tries to convert a column to dtype datetime64.
-
-    :param df: (DataFrame)
-    :param col_name: (str) the name of the column
-    :return: Boolean
-    """
-    try:
-        df[col_name] = pd.to_datetime(df[col_name])
-    except Exception:
-        return 0
-    return 1
-
-
 class OneInputToFinalOptimization:
     date_slices = {
         'one_month_period': TODAY - datetime.timedelta(days=31),
@@ -221,8 +207,8 @@ class OneInputToFinalOptimization:
         """
         for col in self.input_df.columns:
             if 'date' in col or 'Date' in col:
-                if convert_str_col_to_date(self.input_df, col):
-                    self.natural_dividers_dtypes.update({col: 'date'})
+                self.input_df[col] = pd.to_datetime(self.input_df[col])
+                self.natural_dividers_dtypes.update({col: 'date'})
             elif is_string_dtype(self.input_df[col]):
                 if is_natural_divider(self.input_df[col]):
                     self.natural_dividers_dtypes.update({col: 'string'})
@@ -262,7 +248,7 @@ class OneInputToFinalOptimization:
         """
         self.handle_na_in_date_cols(col)
         non_na_inputdf = self.input_df.dropna(subset=[col])
-        self.final_df[col] = convert_str_col_to_date(self.final_df, col)
+        self.final_df[col] = pd.to_datetime(self.final_df[col])
         non_na_finaldf = self.final_df.dropna(subset=[col])
         weighted_benefit = 0
         for period, date_ in self.date_slices.items():
@@ -400,7 +386,7 @@ class MultiColumnFilters:
 
         """
         lists_for_prod = list()
-        self.set_catego_columns()
+        self.set_combo_columns()
         for col in self.combo_cols:
             unique_values = list(self.input_df[col].unique())
             lists_for_prod.append(unique_values)
@@ -420,7 +406,7 @@ class MultiColumnFilters:
                 combos_to_exclude.append(combo_row[0])
         self.combos_to_exclude = pd.concat(combos_to_exclude)
 
-    def set_catego_columns(self):
+    def set_combo_columns(self):
         """If the number of combinations is larger than 'MULTIPLE_COMBINATION_FILTERS' in take out the column with the
         must unique values and calculate the number of combinations again, until the number is bellow the threshold.
 

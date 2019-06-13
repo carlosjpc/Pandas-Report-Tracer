@@ -5,7 +5,7 @@ import unittest
 
 from pandas.util.testing import assert_frame_equal
 
-from pandas_report_tracer.utils.columns_to_work_with import OneInputToFinalOptimization
+from pandas_report_tracer.utils.columns_to_work_with import OneInputToFinalOptimization, isin_row
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -79,7 +79,7 @@ class TestOneInputToFinalOptimization(unittest.TestCase):
         instance = OneInputToFinalOptimization(self.input_df, self.resulting_df, merging_cols=['id2'])
         instance.find_matching_cols()
         instance.merge_input_to_final()
-        instance.final_df_to_work_with()
+        instance.set_final_df_to_work_with()
         instance.columns_usage_percentage()
         assert {'column1': 0.80, 'column2': 0.80, 'id1': 0.75, 'id2': 0.80} == instance.usage_percentage
         assert 0.7875000000000001 == instance.overall_percentage
@@ -93,10 +93,5 @@ class TestOneInputToFinalOptimization(unittest.TestCase):
         })
         row_1 = rows.iloc[[0]]
         row_2 = rows.iloc[[1]]
-        assert OneInputToFinalOptimization.isin_row(row_1, self.input_df)
-        assert not OneInputToFinalOptimization.isin_row(row_2, self.input_df)
-
-    def test_use_all_slicing_cols_as_catego_cols(self):
-        instance = OneInputToFinalOptimization(self.input_df, self.resulting_df)
-        instance.slicing_cols = instance.input_df_cols
-        assert instance.use_all_slicing_cols_as_catego_cols()
+        assert isin_row(row_1, self.input_df)
+        assert not isin_row(row_2, self.input_df)
