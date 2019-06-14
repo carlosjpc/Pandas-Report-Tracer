@@ -5,7 +5,7 @@ import pickle as pkl
 import os
 import unittest
 
-from pandas_report_tracer.utils.columns_to_work_with import (OneInputToFinalOptimization, analyze_one_input_to_result,
+from pandas_report_tracer.utils.columns_to_work_with import (OneInputToFinalOptimization, MultiColumnFilters,
                                                              filter_and_save_inputfile)
 from pandas_report_tracer.utils.report_generation import generate_data_usage_plot
 
@@ -23,10 +23,10 @@ class TestOneInputToFinalOptimizationAMS(unittest.TestCase):
     ams_based_obj = OneInputToFinalOptimization(ams_input_fixture, ams_result_fixture, merging_cols=['index'])
     ams_based_obj.find_matching_cols()
     ams_based_obj.merge_input_to_final()
-    ams_based_obj.final_df_to_work_with()
+    ams_based_obj.set_final_df_to_work_with()
     ams_based_obj.columns_usage_percentage()
-    ams_based_obj.set_slicing_cols()
-    for slicing_col, dtype in ams_based_obj.slicing_cols.items():
+    ams_based_obj.get_dtypes_for_natural_divider_cols()
+    for slicing_col, dtype in ams_based_obj.natural_dividers_dtypes.items():
         if 'date' in dtype:
             ams_based_obj.determine_date_range_filters(slicing_col)
         else:
@@ -91,8 +91,8 @@ class TestOneInputToFinalOptimizationAMS(unittest.TestCase):
     def test_overall_percentage(self):
         assert self.ams_based_obj.overall_percentage == 0.23915826258701534
 
-    def test_set_slicing_cols(self):
-        assert self.ams_based_obj.slicing_cols == {
+    def test_get_dtypes_for_natural_divider_cols(self):
+        assert self.ams_based_obj.natural_dividers_dtypes == {
             'actual_arrival_date': 'date',
             'carrier_code': 'string',
             'conveyance_id': 'string',
@@ -142,19 +142,17 @@ class TestOneInputToFinalOptimizationAMS(unittest.TestCase):
         expected_filtered_input = pd.read_csv("{}/fixtures/test_results/expected_filtered_input.csv".format(HERE))
         assert df_equal_without_column_order(filtered_input, expected_filtered_input)
 
-    def test_use_all_slicing_cols_as_catego_cols(self):
-        instance = OneInputToFinalOptimization(self.ams_input_fixture, self.ams_result_fixture)
-        instance.slicing_cols = instance.input_df_cols
-        assert not instance.use_all_slicing_cols_as_catego_cols()
-
-    def test_set_catego_columns(self):
-        self.ams_based_obj.set_catego_columns()
-        assert self.ams_based_obj.catego_cols == [
+    def test_set_combo_columns(self):
+        ams_based_multi_col_obj = MultiColumnFilters(self.ams_input_fixture, self.ams_result_fixture)
+        ams_based_multi_col_obj.set_combo_columns()
+        assert ams_based_multi_col_obj.combo_cols == [
             'foreign_port_of_lading_qualifier', 'weight_unit', 'record_status_indicator',
             'foreign_port_of_destination_qualifier', 'conveyance_id_qualifier', 'in_bond_entry_type',
-            'mode_of_transportation', 'secondary_notify_party_8'
+            'mode_of_transportation', 'secondary_notify_party_8', 'secondary_notify_party_9',
+            'secondary_notify_party_10'
         ]
 
     def test_multi_column_logic(self):
-        self.ams_based_obj.determine_possible_multi_column_filters()
+        ams_based_multi_col_obj = MultiColumnFilters(self.ams_input_fixture, self.ams_result_fixture)
+        ams_based_multi_col_obj.determine_possible_multi_column_filters()
         # self.ams_based_obj.determine_multi_column_filters()
