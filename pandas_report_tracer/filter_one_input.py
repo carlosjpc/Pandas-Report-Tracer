@@ -6,7 +6,7 @@ import logging
 
 import pandas as pd
 
-from utils.columns_to_work_with import OneInputToFinalOptimization, analyze_one_input_to_result, filter_and_save_inputfile
+from utils.columns_to_work_with import SingleColumnFilters
 from utils.report_generation import print_report, generate_data_usage_plot
 
 logger = logging.getLogger()
@@ -40,14 +40,14 @@ if __name__ == "__main__":
         else:
             input_df = results[run_number - 1].input_df
         if filenames[0] in MERGING_DICT:
-            results[run_number] = OneInputToFinalOptimization(input_df, resulting_df, MERGING_DICT[filenames[0]])
+            results[run_number] = SingleColumnFilters(
+                input_df, resulting_df, MERGING_DICT[filenames[0]], input_file_name=filenames[0]
+            )
         else:
-            results[run_number] = OneInputToFinalOptimization(input_df, resulting_df)
-        analyze_one_input_to_result(results[run_number])
+            results[run_number] = SingleColumnFilters(input_df, resulting_df, input_file_name=filenames[0])
+        results[run_number].make_analysis(apply_filter=True)
         data_usage_plot = generate_data_usage_plot(results[run_number])
         print_report(results[run_number], filenames[0], result_file, data_usage_plot)
-        if (results[run_number].max_weighted_benefit / input_df_row_num) > MIN_BENEFIT_RATIO:
-            filter_and_save_inputfile(results[run_number], filenames[0])
-            logging.info("Applied weighted benefit: {}".format(str(results[run_number].max_weighted_benefit)))
-        else:
+        logging.info("Applied weighted benefit: {}".format(str(results[run_number].max_weighted_benefit)))
+        if (results[run_number].max_weighted_benefit / input_df_row_num) < MIN_BENEFIT_RATIO:
             break

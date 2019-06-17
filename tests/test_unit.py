@@ -5,7 +5,7 @@ import unittest
 
 from pandas.util.testing import assert_frame_equal
 
-from pandas_report_tracer.utils.columns_to_work_with import OneInputToFinalOptimization, isin_row
+from pandas_report_tracer.utils.columns_to_work_with import SingleColumnFilters, isin_row
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -19,7 +19,7 @@ def df_equal_without_column_order(df1, df2):
         return 1
 
 
-class TestOneInputToFinalOptimization(unittest.TestCase):
+class TestSingleColumnFilters(unittest.TestCase):
 
     input_df = pd.DataFrame({
         'column1': [1, 2, 3, 4, 5],
@@ -36,7 +36,7 @@ class TestOneInputToFinalOptimization(unittest.TestCase):
     def test_find_matching_cols_no_ids(self):
         input_df = pd.DataFrame(columns=['column1', 'column2', 'column3'])
         resulting_df = pd.DataFrame(columns=['column1', 'column3', 'id1'])
-        instance = OneInputToFinalOptimization(input_df, resulting_df)
+        instance = SingleColumnFilters(input_df, resulting_df)
         instance.find_matching_cols()
         assert set(instance.matching_cols) == {'column1', 'column3'}
         assert instance.matching_id_cols == []
@@ -44,15 +44,15 @@ class TestOneInputToFinalOptimization(unittest.TestCase):
     def test_find_matching_cols_w_ids(self):
         input_df = pd.DataFrame(columns=['column1', 'column2', 'column3', 'id1'])
         resulting_df = pd.DataFrame(columns=['column1', 'column3', 'id1'])
-        instance = OneInputToFinalOptimization(input_df, resulting_df)
+        instance = SingleColumnFilters(input_df, resulting_df)
         instance.find_matching_cols()
         assert set(instance.matching_cols) == {'id1', 'column3', 'column1'}
         assert instance.matching_id_cols == ['id1']
 
     def test_merge_input_to_final(self):
-        instance = OneInputToFinalOptimization(self.input_df, self.resulting_df)
+        instance = SingleColumnFilters(self.input_df, self.resulting_df)
         instance.find_matching_cols()
-        instance.merge_input_to_final()
+        instance._merge_input_to_final()
         expected_df = pd.DataFrame({
             'column3': ['uncle', 'bob', 'partitioning', 'tdd'],
             'id1': ['key1.1', 'key1.2', 'key1.3', 'key1.4'],
@@ -63,9 +63,9 @@ class TestOneInputToFinalOptimization(unittest.TestCase):
         assert df_equal_without_column_order(instance.extended_resulting_df, expected_df)
 
     def test_merge_input_to_final_w_merging_cols(self):
-        instance2 = OneInputToFinalOptimization(self.input_df, self.resulting_df, merging_cols=['id2'])
+        instance2 = SingleColumnFilters(self.input_df, self.resulting_df, merging_cols=['id2'])
         instance2.find_matching_cols()
-        instance2.merge_input_to_final()
+        instance2._merge_input_to_final()
         expected_df = pd.DataFrame({
             'column3': ['uncle', 'bob', 'partitioning', 'tdd'],
             'id1': ['key1.1', 'key1.2', 'key1.3', 'key1.4'],
@@ -76,10 +76,10 @@ class TestOneInputToFinalOptimization(unittest.TestCase):
         assert df_equal_without_column_order(instance2.extended_resulting_df, expected_df)
 
     def test_columns_usage_percentage(self):
-        instance = OneInputToFinalOptimization(self.input_df, self.resulting_df, merging_cols=['id2'])
+        instance = SingleColumnFilters(self.input_df, self.resulting_df, merging_cols=['id2'])
         instance.find_matching_cols()
-        instance.merge_input_to_final()
-        instance.set_final_df_to_work_with()
+        instance._merge_input_to_final()
+        instance._set_final_df_to_work_with()
         instance.columns_usage_percentage()
         assert {'column1': 0.80, 'column2': 0.80, 'id1': 0.75, 'id2': 0.80} == instance.usage_percentage
         assert 0.7875000000000001 == instance.overall_percentage

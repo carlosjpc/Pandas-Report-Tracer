@@ -32,7 +32,7 @@ def print_report(obj, input_file, result_file, data_usage_plot):
 def generate_data_usage_plot(obj):
     """Generates a plotly horizontal bar char on the axis 'x' and 'y'
 
-    :param obj: (object) of the class OneInputToFinalOptimization
+    :param obj: (object) of the class SingleColumnFilters
     :return: html plot
     """
     usage_data = [go.Bar(

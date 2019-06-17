@@ -5,8 +5,8 @@ import pickle as pkl
 import os
 import unittest
 
-from pandas_report_tracer.utils.columns_to_work_with import (OneInputToFinalOptimization, MultiColumnFilters,
-                                                             filter_and_save_inputfile)
+from pandas_report_tracer.utils.columns_to_work_with import SingleColumnFilters, MultiColumnFilters
+
 from pandas_report_tracer.utils.report_generation import generate_data_usage_plot
 
 from tests.test_unit import df_equal_without_column_order
@@ -14,24 +14,15 @@ from tests.test_unit import df_equal_without_column_order
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 
-class TestOneInputToFinalOptimizationAMS(unittest.TestCase):
+class TestSingleColumnFiltersAMS(unittest.TestCase):
     # check tests Readme.md
     ams_input_fixture = pd.read_csv(
         '{}/fixtures/input/AMSBillofLandingHeaders-2018-sample.csv.gz'.format(HERE), compression='gzip')
     ams_result_fixture = pd.read_csv(
         '{}/fixtures/result/filtered_AMSBillofLandingHeaders-2018-sample.csv.gz'.format(HERE), compression='gzip')
-    ams_based_obj = OneInputToFinalOptimization(ams_input_fixture, ams_result_fixture, merging_cols=['index'])
-    ams_based_obj.find_matching_cols()
-    ams_based_obj.merge_input_to_final()
-    ams_based_obj.set_final_df_to_work_with()
-    ams_based_obj.columns_usage_percentage()
-    ams_based_obj.get_dtypes_for_natural_divider_cols()
-    for slicing_col, dtype in ams_based_obj.natural_dividers_dtypes.items():
-        if 'date' in dtype:
-            ams_based_obj.determine_date_range_filters(slicing_col)
-        else:
-            ams_based_obj.determine_category_col_filters(slicing_col)
-    ams_based_obj.determine_best_slicing_col_filter()
+    ams_based_obj = SingleColumnFilters(ams_input_fixture, ams_result_fixture, merging_cols=['index'])
+    ams_based_obj.input_file_name = '/tmp/filtered_input.csv'
+    ams_based_obj.make_analysis(apply_filter=True)
 
     def test_ams_find_matching_cols(self):
         assert set(self.ams_based_obj.matching_cols) == {
@@ -96,17 +87,14 @@ class TestOneInputToFinalOptimizationAMS(unittest.TestCase):
             'actual_arrival_date': 'date',
             'carrier_code': 'string',
             'conveyance_id': 'string',
-            'conveyance_id_qualifier': 'string',
             'estimated_arrival_date': 'date',
             'foreign_port_of_destination': 'string',
             'foreign_port_of_destination_qualifier': 'string',
             'foreign_port_of_lading': 'string',
-            'foreign_port_of_lading_qualifier': 'string',
             'in_bond_entry_type': 'string',
             'manifest_unit': 'string',
             'measurement': 'integer',
             'measurement_unit': 'string',
-            'mode_of_transportation': 'string',
             'port_of_destination': 'string',
             'port_of_unlading': 'string',
             'record_status_indicator': 'string',
@@ -137,22 +125,22 @@ class TestOneInputToFinalOptimizationAMS(unittest.TestCase):
         assert x == 'Schedule K Foreign Port'
 
     def test_filter_and_save_inputfile(self):
-        filter_and_save_inputfile(self.ams_based_obj, '/tmp/filtered_input.csv')
         filtered_input = pd.read_csv('/tmp/filtered_input.csv', encoding='utf-8', escapechar='\\')
         expected_filtered_input = pd.read_csv("{}/fixtures/test_results/expected_filtered_input.csv".format(HERE))
         assert df_equal_without_column_order(filtered_input, expected_filtered_input)
 
-    def test_set_combo_columns(self):
-        ams_based_multi_col_obj = MultiColumnFilters(self.ams_input_fixture, self.ams_result_fixture)
-        ams_based_multi_col_obj.set_combo_columns()
-        assert ams_based_multi_col_obj.combo_cols == [
-            'foreign_port_of_lading_qualifier', 'weight_unit', 'record_status_indicator',
-            'foreign_port_of_destination_qualifier', 'conveyance_id_qualifier', 'in_bond_entry_type',
-            'mode_of_transportation', 'secondary_notify_party_8', 'secondary_notify_party_9',
-            'secondary_notify_party_10'
-        ]
 
-    def test_multi_column_logic(self):
-        ams_based_multi_col_obj = MultiColumnFilters(self.ams_input_fixture, self.ams_result_fixture)
-        ams_based_multi_col_obj.determine_possible_multi_column_filters()
-        # self.ams_based_obj.determine_multi_column_filters()
+class TestMultiColumnFiltersAMS(unittest.TestCase):
+    # check tests Readme.md
+    ams_input_fixture = pd.read_csv(
+        '{}/fixtures/input/AMSBillofLandingHeaders-2018-sample.csv.gz'.format(HERE), compression='gzip')
+    ams_result_fixture = pd.read_csv(
+        '{}/fixtures/result/filtered_AMSBillofLandingHeaders-2018-sample.csv.gz'.format(HERE), compression='gzip')
+    ams_based_multi_col_obj = MultiColumnFilters(ams_input_fixture, ams_result_fixture, merging_cols=['index'])
+    ams_based_multi_col_obj.get_multi_column_filters()
+
+    def test_set_combo_columns(self):
+        assert self.ams_based_multi_col_obj.combo_cols == [
+            'weight_unit', 'record_status_indicator', 'foreign_port_of_destination_qualifier', 'in_bond_entry_type',
+            'secondary_notify_party_8'
+        ]
